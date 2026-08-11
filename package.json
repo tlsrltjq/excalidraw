@@ -82,6 +82,7 @@
     "locales-coverage:description": "node scripts/locales-coverage-description.js",
     "prepare": "husky install",
     "prettier": "prettier \"**/*.{css,scss,json,md,html,yml}\" --ignore-path=.eslintignore",
+    "personal:check": "node ./personal-cloud-harness/check-guardrails.mjs",
     "release": "node scripts/release.js",
     "release:test": "node scripts/release.js --tag=test",
     "release:next": "node scripts/release.js --tag=next",
