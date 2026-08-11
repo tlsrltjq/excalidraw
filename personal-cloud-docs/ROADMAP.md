@@ -67,7 +67,7 @@ Port:   3001 (.env.development)
 - [x] 사각형 생성 확인
 - [x] 텍스트와 화살표 생성 확인
 - [x] PNG/SVG Export 화면과 관련 자동 테스트 확인
-- [ ] 실제 PNG/SVG/Excalidraw 파일 다운로드 확인
+- [x] 실제 PNG/SVG/Excalidraw 파일 다운로드 확인
 - [x] 새로고침 후 로컬 복구 확인
 - [x] `yarn test:typecheck`
 - [x] `yarn test:code`
@@ -86,6 +86,7 @@ Port:   3001 (.env.development)
 - 개발 서버 `http://127.0.0.1:3001/` 기동을 확인했다.
 - 브라우저에서 사각형 생성 후 새로고침해 로컬 복구를 확인했다.
 - 브라우저에서 텍스트와 화살표 생성, PNG/SVG Export 화면을 확인했다.
+- 사용자가 실제 PNG/SVG/Excalidraw 파일 다운로드를 확인했다.
 - 브라우저 console error는 0건이었다.
 - TypeScript typecheck, ESLint, 전체 Vitest, production build가 성공했다.
 - Vitest 결과는 121 files, 1,858 tests 통과, 47 skipped, 1 todo다.
