@@ -6,6 +6,7 @@
 ## 문서 목록
 
 - [ROADMAP.md](./ROADMAP.md): 전체 구현 순서와 단계별 완료 조건
+- [ARCHITECTURE.md](./ARCHITECTURE.md): 개발 흐름, MVP 및 최종 아키텍처
 - [DECISIONS.md](./DECISIONS.md): 주요 설계 결정과 미결정 사항
 - [ENGINEERING_GUARDRAILS.md](./ENGINEERING_GUARDRAILS.md): 소스 코드와 로직 구현 규칙
 
@@ -26,6 +27,7 @@
 personal-cloud-docs/
 ├── README.md
 ├── ROADMAP.md
+├── ARCHITECTURE.md
 ├── DECISIONS.md
 ├── ENGINEERING_GUARDRAILS.md
 ├── cloud-storage.md       # Cloud Save 구현 시

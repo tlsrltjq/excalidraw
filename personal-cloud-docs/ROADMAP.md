@@ -38,11 +38,11 @@ MVP 범위는 로그인, 그림 목록, 자동 저장, 이미지 복원, 여러 
 - [x] 개인 노트북에 Clone
 - [x] `origin`이 개인 Fork를 가리킴
 - [x] 작업 트리가 깨끗한 `master` 상태
-- [ ] 공식 저장소를 `upstream`으로 등록
-- [ ] Yarn 1.22.22 준비
-- [ ] 의존성 설치
-- [ ] 원본 앱 실행 및 기능 확인
-- [ ] 원본 앱 빌드 확인
+- [x] 공식 저장소를 `upstream`으로 등록
+- [x] Yarn 1.22.22 준비
+- [x] 의존성 설치
+- [x] 원본 앱 실행 및 기본 편집/로컬 복구 확인
+- [x] 원본 앱 빌드 확인
 - [x] 코딩 에이전트 작업 규칙과 자동 guardrail 구성
 
 현재 확인된 환경:
@@ -58,19 +58,38 @@ Port:   3001 (.env.development)
 
 목적은 개인 기능을 추가하기 전 정상 동작 기준점을 확보하는 것이다.
 
-- [ ] `upstream` remote 등록
-- [ ] `origin`과 `upstream` 확인
-- [ ] Yarn 1.22.22 준비
-- [ ] `yarn install`
-- [ ] `yarn start`
-- [ ] 캔버스, 도형, 텍스트, 화살표 확인
-- [ ] PNG/SVG/Excalidraw Export 확인
-- [ ] 새로고침 후 로컬 복구 확인
-- [ ] `yarn test:typecheck`
-- [ ] `yarn build`
-- [ ] `node personal-cloud-harness/check-guardrails.mjs`
+- [x] `upstream` remote 등록
+- [x] `origin`과 `upstream` 확인
+- [x] Yarn 1.22.22 준비
+- [x] `yarn install`
+- [x] `yarn start`
+- [x] 캔버스 렌더링 확인
+- [x] 사각형 생성 확인
+- [x] 텍스트와 화살표 생성 확인
+- [x] PNG/SVG Export 화면과 관련 자동 테스트 확인
+- [ ] 실제 PNG/SVG/Excalidraw 파일 다운로드 확인
+- [x] 새로고침 후 로컬 복구 확인
+- [x] `yarn test:typecheck`
+- [x] `yarn test:code`
+- [x] `yarn test:app --watch=false`
+- [x] `yarn build`
+- [x] `node personal-cloud-harness/check-guardrails.mjs`
 
 완료 조건: 수정하지 않은 upstream 앱이 로컬에서 실행되고 빌드된다.
+
+### Baseline 검증 기록
+
+2026-08-11:
+
+- `master`와 `upstream/master`가 동일한 commit임을 확인했다.
+- Yarn 1.22.22로 frozen lockfile 설치를 완료했다.
+- 개발 서버 `http://127.0.0.1:3001/` 기동을 확인했다.
+- 브라우저에서 사각형 생성 후 새로고침해 로컬 복구를 확인했다.
+- 브라우저에서 텍스트와 화살표 생성, PNG/SVG Export 화면을 확인했다.
+- 브라우저 console error는 0건이었다.
+- TypeScript typecheck, ESLint, 전체 Vitest, production build가 성공했다.
+- Vitest 결과는 121 files, 1,858 tests 통과, 47 skipped, 1 todo다.
+- upstream dependency peer warning, 오래된 Browserslist DB, 큰 bundle chunk 경고가 있다.
 
 ## Milestone 1: Branch와 Baseline 배포
 
