@@ -14,6 +14,7 @@ import { LanguageList } from "../app-language/LanguageList";
 import { isExcalidrawPlusSignedUser } from "../app_constants";
 
 import { saveDebugState } from "./DebugCanvas";
+import { CloudAuthMenuItems } from "./cloud/CloudAuthMenuItems";
 
 export const AppMainMenu: React.FC<{
   onCollabDialogOpen: () => any;
@@ -38,6 +39,7 @@ export const AppMainMenu: React.FC<{
       <MainMenu.DefaultItems.SearchMenu />
       <MainMenu.DefaultItems.Help />
       <MainMenu.DefaultItems.ClearCanvas />
+      <CloudAuthMenuItems />
       <MainMenu.Separator />
       <MainMenu.ItemLink
         icon={ExcalLogo}

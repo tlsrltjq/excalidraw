@@ -2,8 +2,7 @@
 
 ## 목표
 
-공개 Excalidraw를 기반으로 기존 local-first 기능을 유지하면서 다음 기능을
-순차적으로 추가한다.
+공개 Excalidraw를 기반으로 기존 local-first 기능을 유지하면서 다음 기능을순차적으로 추가한다.
 
 ```text
 로그인
@@ -16,8 +15,7 @@
   -> MCP / Codex 연동
 ```
 
-MVP 범위는 로그인, 그림 목록, 자동 저장, 이미지 복원, 여러 기기 동기화까지다.
-공동편집, AI, MCP는 MVP 이후에 진행한다.
+MVP 범위는 로그인, 그림 목록, 자동 저장, 이미지 복원, 여러 기기 동기화까지다. 공동편집, AI, MCP는 MVP 이후에 진행한다.
 
 ## 핵심 원칙
 
@@ -126,22 +124,20 @@ Claude Code 브라우저 도구로 `https://personal-excalidraw.vercel.app`을 �
 
 **완료 조건 충족**: 노트북이 꺼져도 배포된 원본 Excalidraw에 접속할 수 있다.
 
-CORS는 같은 origin 앱을 보호하는 설정이 아니다. 전역
-`Access-Control-Allow-Origin`을 개인 배포 URL로 단순 치환하지 않고 실제로
-cross-origin 접근이 필요한 asset에만 설정한다.
+CORS는 같은 origin 앱을 보호하는 설정이 아니다. 전역 `Access-Control-Allow-Origin`을 개인 배포 URL로 단순 치환하지 않고 실제로 cross-origin 접근이 필요한 asset에만 설정한다.
 
 완료 조건: 노트북이 꺼져도 배포된 원본 Excalidraw에 접속할 수 있다.
 
 ## Milestone 2: Supabase 기반과 인증
 
-- [ ] Supabase 프로젝트 생성
-- [ ] SQL migration 디렉터리 추가
-- [ ] `@supabase/supabase-js`를 `excalidraw-app` workspace에 추가
-- [ ] Supabase client와 환경변수 타입 추가
-- [ ] Google OAuth 로그인/로그아웃 구현
-- [ ] session restore 구현
-- [ ] 익명 사용자의 기존 local-first 편집 유지
-- [ ] OAuth redirect URL을 개발/운영 주소로 제한
+- [ ] Supabase 프로젝트 생성 (사용자가 직접 — 계정/프로젝트 생성은 에이전트가 대신할 수 없음)
+- [x] SQL migration 디렉터리 추가 (`supabase/migrations/README.md`, 컨벤션만 — Milestone 3부터 실제 테이블)
+- [x] `@supabase/supabase-js`를 `excalidraw-app` workspace에 추가 (2.112.3)
+- [x] Supabase client와 환경변수 타입 추가 (`excalidraw-app/cloud/supabaseClient.ts`, `vite-env.d.ts`)
+- [x] Google OAuth 로그인/로그아웃 구현 (`excalidraw-app/components/cloud/CloudAuthMenuItems.tsx`, 메인 메뉴에 통합)
+- [x] session restore 구현 (`excalidraw-app/cloud/session.ts` — `getSession` + `onAuthStateChange`)
+- [x] 익명 사용자의 기존 local-first 편집 유지 (아래 코드 레벨 확인 기록)
+- [ ] OAuth redirect URL을 개발/운영 주소로 제한 (Supabase/Google Cloud Console 설정 — 사용자가 직접)
 
 프론트엔드 허용 환경변수:
 
@@ -151,6 +147,41 @@ VITE_SUPABASE_PUBLISHABLE_KEY
 ```
 
 완료 조건: 로그인과 로그아웃 후에도 익명/로그인 사용 흐름이 각각 정상이다.
+
+### 2026-08-19 코드 스캐폴딩 진행 기록
+
+Supabase 프로젝트가 아직 없는 상태에서 계정/인증이 필요 없는 부분부터 먼저 구현했다.
+
+- `supabase/migrations/README.md`: migration 파일명 규칙, RLS를 같은 파일에서 함께
+  작성하는 규칙, `check-guardrails.mjs`가 RLS 누락을 감지한다는 점을 기록.
+- `excalidraw-app/package.json`에 `@supabase/supabase-js@2.112.3` 추가, `yarn install` 완료.
+- `excalidraw-app/vite-env.d.ts`에 `VITE_SUPABASE_URL?`, `VITE_SUPABASE_PUBLISHABLE_KEY?`를
+  **optional**로 추가했다. Cloud 환경변수가 없어도 타입 에러 없이 앱이 동작해야 하기 때문이다.
+- `excalidraw-app/cloud/supabaseClient.ts`: 두 환경변수가 모두 있을 때만 client를 생성하고,
+  없으면 `supabase = null` + `isCloudConfigured = false`로 fail-soft 처리한다. 모든 Cloud
+  모듈은 이 값을 null-check 하고 절대 throw하지 않아야 한다 (AGENTS.md 변경 경계 참고).
+- `excalidraw-app/cloud/session.ts`: `useCloudSession()` 훅이 `supabase.auth.getSession()`으로
+  세션을 복원하고 `onAuthStateChange` 구독을 유지한다. React Strict Mode에서 effect가
+  다시 실행돼도 안전하도록 cleanup에서 `subscription.unsubscribe()`와 `cancelled` guard를 둔다
+  (ENGINEERING_GUARDRAILS.md #10). `signInWithGoogle()`, `signOut()`도 여기서 export한다.
+- `excalidraw-app/components/cloud/CloudAuthMenuItems.tsx`: 메인 메뉴(`AppMainMenu.tsx`)의
+  "캔버스 초기화" 바로 다음에 추가. `isCloudConfigured`가 `false`이거나 세션 로딩 중이면
+  `null`을 반환해 기존 메뉴에 어떤 항목도 추가하지 않는다.
+- **로컬 dev 서버로 확인**: Cloud 환경변수가 없는 상태에서 앱이 정상 기동하고, 콘솔에
+  `[personal-cloud] ... Cloud auth is disabled, running in anonymous local-first mode.`
+  info 로그만 찍히며, 메인 메뉴를 열어도 로그인 관련 항목이 전혀 보이지 않아 기존 익명
+  local-first 흐름이 그대로 유지됨을 확인했다 (D-004 충족).
+- `yarn test:typecheck`, `yarn fix`(prettier + eslint --fix) 통과.
+- **아직 실제 로그인은 검증하지 못했다**: Supabase 프로젝트가 없어 `signInWithGoogle()` /
+  `signOut()` 자체의 실제 OAuth 흐름과 session restore는 테스트하지 않았다. 사용자가
+  Supabase 프로젝트를 만들고 Google OAuth provider를 켠 뒤 아래를 전달하면 이어서
+  진행한다:
+  - `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (publishable/anon key — RLS로
+    보호되므로 공개돼도 안전하다. `.env.development`/`.env.production`에 커밋해도 된다.)
+  - Supabase Dashboard → Authentication → URL Configuration에서 Site URL/Redirect URLs에
+    `http://localhost:3001`과 `https://personal-excalidraw.vercel.app`을 등록해야 한다.
+  - Google Cloud Console에서 OAuth client의 Authorized redirect URI에 Supabase가 제공하는
+    콜백 URL(`https://<project-ref>.supabase.co/auth/v1/callback`)을 등록해야 한다.
 
 ## Milestone 3: Cloud Workspace
 
@@ -175,15 +206,13 @@ drawings
 └── updated_at
 ```
 
-`owner_id`는 가능하면 DB에서 `auth.uid()`를 기본값으로 설정해 클라이언트가
-임의 사용자 ID를 전달하지 않게 한다.
+`owner_id`는 가능하면 DB에서 `auth.uid()`를 기본값으로 설정해 클라이언트가임의 사용자 ID를 전달하지 않게 한다.
 
 완료 조건: 로그인한 사용자가 본인 그림만 생성하고 열고 삭제할 수 있다.
 
 ## Milestone 4: 문서별 로컬 초안과 Cloud Save
 
-Cloud Save 구현 전 문서별 로컬 초안을 먼저 만든다. 현재 upstream 로컬 저장은
-하나의 장면을 고정 key에 저장하므로 여러 Cloud 문서를 그대로 연결하면 안 된다.
+Cloud Save 구현 전 문서별 로컬 초안을 먼저 만든다. 현재 upstream 로컬 저장은하나의 장면을 고정 key에 저장하므로 여러 Cloud 문서를 그대로 연결하면 안 된다.
 
 문서별로 관리할 상태:
 

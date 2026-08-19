@@ -38,6 +38,12 @@ interface ImportMetaEnv {
 
   VITE_APP_GIT_SHA: string;
 
+  // Personal Cloud (see personal-cloud-docs/). Optional: when unset, Cloud
+  // auth/workspace features stay disabled and the app falls back to the
+  // existing anonymous local-first flow (see DECISIONS.md D-004).
+  VITE_SUPABASE_URL?: string;
+  VITE_SUPABASE_PUBLISHABLE_KEY?: string;
+
   MODE: string;
 
   DEV: string;
