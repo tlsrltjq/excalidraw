@@ -28,19 +28,45 @@
 
 ## D-005: Cloud scene 암호화
 
-- 상태: 미결정
-- 선택지 A: scene JSON을 RLS로 보호되는 PostgreSQL에 저장한다.
-- 선택지 B: scene을 클라이언트에서 암호화한 뒤 저장한다.
-- 고려사항: A는 검색, AI, MCP가 쉽고 B는 서버가 평문을 볼 수 없지만 검색과 agent 연동이 복잡하다.
-- 결정 시점: `drawings` schema migration 작성 전
+- 상태: 결정
+- 결정: 선택지 A — scene JSON(`serializeAsJSON(..., "database")` 결과)을 RLS로
+  보호되는 PostgreSQL `jsonb` 컬럼에 평문으로 저장한다.
+- 근거:
+  - Milestone 9(AI Gateway)와 Milestone 11(MCP)이 scene 내용을 읽고 구조화된
+    operation으로 조작해야 하는데, 클라이언트 암호화(B)를 쓰면 서버/에이전트가
+    평문에 접근할 방법이 없어 그 마일스톤들이 사실상 막힌다.
+  - RLS가 이미 `owner_id = auth.uid()`로 row 단위 접근을 막기 때문에, 지금
+    위협 모델에서 실질적으로 얻는 보호는 "Supabase 자체가 침해당했을 때"
+    정도이고, 그 대가로 검색/AI 연동을 전부 포기하는 건 이 프로젝트의 로드맵
+    방향과 맞지 않는다.
+  - 협업(Live Collaboration) 쪽은 별도로 이미 client-side encryption을 쓰고
+    있고(Milestone 8, D-008/D-009 근처) 계속 유지한다 — 이 결정은 Cloud
+    Workspace의 `drawings.scene_data`에만 적용된다.
+- 영향: `drawings.scene_data`는 평문 JSON이므로 RLS policy가 유일한 접근
+  제어 수단이다 — policy 작성/테스트를 특히 꼼꼼히 한다. 나중에 위협 모델이
+  바뀌면(예: 여러 사용자에게 공유하는 기능) 이 결정을 재검토한다.
+- 결정일: 2026-08-19 (`drawings` schema migration 작성 시점)
 
 ## D-006: Cloud 문서 URL 표현
 
-- 상태: 미결정
-- 선택지 A: `?drawing=<uuid>` query parameter
-- 선택지 B: `/drawings/<uuid>` route
-- 고려사항: 기존 hash는 share/collaboration 링크에서 사용하므로 Cloud drawing ID에 재사용하지 않는다.
-- 결정 시점: Cloud Workspace 구현 전
+- 상태: 결정
+- 결정: `?drawing=<uuid>` query parameter를 사용한다.
+- 근거:
+  - `excalidraw-app`은 현재 client-side router가 없다 (`App.tsx` 단일 컴포넌트 트리,
+    `react-router` 등 미사용). `/drawings/<uuid>` 같은 path route를 쓰려면 router
+    dependency 추가와 `vercel.json`에 SPA fallback rewrite(`/drawings/*` ->
+    `index.html`)가 새로 필요해 변경 범위와 upstream 충돌 위험이 커진다.
+  - query parameter는 `/index.html?drawing=<uuid>`로 그대로 기존 static 배포에서
+    동작해 서버 설정 변경이 전혀 필요 없다 (D-003의 "새 dependency는 기존 코드나
+    Web API로 해결할 수 없는 경우에만 추가" 원칙과 일치).
+  - 기존에 예약된 URL 흐름은 `?id`(legacy JSON backend), `#json=`, `#room=`,
+    `#url=`이다(`AGENTS.md` URL/호환성 규칙, `App.tsx`의 `initializeScene` 확인).
+    `drawing`은 이름이 겹치지 않는다.
+- 영향: `excalidraw-app/cloud/urlDrawingId.ts`가 `history.pushState`/
+  `replaceState`로 `?drawing=`만 다루고 hash는 건드리지 않는다. 나중에 path
+  기반 route가 필요해지면(예: SEO, 공유 링크 미리보기) 이 결정을 재검토하고
+  여기에 기록한다.
+- 결정일: 2026-08-19 (Milestone 3 구현 착수 시점)
 
 ## D-007: 동시 수정 충돌 UX
 

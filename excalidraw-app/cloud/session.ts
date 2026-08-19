@@ -5,8 +5,6 @@
  * (DECISIONS.md D-004). Login is only a precondition for the Cloud
  * Workspace (Milestone 3+), not for the app itself.
  */
-import { useEffect } from "react";
-
 import { atom, useAtomValue, appJotaiStore } from "../app-jotai";
 
 import { supabase, isCloudConfigured } from "./supabaseClient";
@@ -14,7 +12,7 @@ import { supabase, isCloudConfigured } from "./supabaseClient";
 import type { Session } from "@supabase/supabase-js";
 
 export type CloudSessionState = {
-  /** `null` while the initial session restore hasn't resolved yet. */
+  /** `"loading"` while the initial session restore hasn't resolved yet. */
   status: "loading" | "signed-out" | "signed-in";
   session: Session | null;
 };
@@ -28,54 +26,36 @@ const initialState: CloudSessionState = {
 
 export const cloudSessionAtom = atom<CloudSessionState>(initialState);
 
-/**
- * Restores the existing session (if any) and subscribes to auth changes.
- * Safe to call from multiple components / to re-run under React Strict
- * Mode: the supabase-js auth listener is idempotent per-subscription and we
- * always unsubscribe on cleanup (ENGINEERING_GUARDRAILS.md #10).
- */
-export const useCloudSession = (): CloudSessionState => {
-  useEffect(() => {
-    if (!supabase) {
-      return;
+// Set up the session restore + auth-change subscription exactly once, at
+// module scope — `supabase` is already a module-level singleton, so every
+// consumer of `useCloudSession()` shares this one subscription instead of
+// each mounting its own (ENGINEERING_GUARDRAILS.md #10: don't duplicate
+// listeners/requests that hot paths or multiple components would otherwise
+// each re-create). ES modules only evaluate their top level once per
+// resolved module, so this isn't affected by React Strict Mode's
+// double-invocation of render/effects.
+if (supabase) {
+  supabase.auth.getSession().then(({ data, error }) => {
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error("[personal-cloud] failed to restore session", error);
     }
-
-    let cancelled = false;
-
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (cancelled) {
-        return;
-      }
-      if (error) {
-        // eslint-disable-next-line no-console
-        console.error("[personal-cloud] failed to restore session", error);
-      }
-      appJotaiStore.set(cloudSessionAtom, {
-        status: data.session ? "signed-in" : "signed-out",
-        session: data.session ?? null,
-      });
+    appJotaiStore.set(cloudSessionAtom, {
+      status: data.session ? "signed-in" : "signed-out",
+      session: data.session ?? null,
     });
+  });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (cancelled) {
-        return;
-      }
-      appJotaiStore.set(cloudSessionAtom, {
-        status: session ? "signed-in" : "signed-out",
-        session,
-      });
+  supabase.auth.onAuthStateChange((_event, session) => {
+    appJotaiStore.set(cloudSessionAtom, {
+      status: session ? "signed-in" : "signed-out",
+      session,
     });
+  });
+}
 
-    return () => {
-      cancelled = true;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  return useAtomValue(cloudSessionAtom);
-};
+export const useCloudSession = (): CloudSessionState =>
+  useAtomValue(cloudSessionAtom);
 
 export const signInWithGoogle = async () => {
   if (!supabase) {

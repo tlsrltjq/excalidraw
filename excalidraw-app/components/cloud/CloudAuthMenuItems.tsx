@@ -1,13 +1,19 @@
 import { MainMenu } from "@excalidraw/excalidraw/index";
-import { loginIcon } from "@excalidraw/excalidraw/components/icons";
+import {
+  loginIcon,
+  LibraryIcon,
+} from "@excalidraw/excalidraw/components/icons";
 import React from "react";
 
+import { useSetAtom } from "../../app-jotai";
 import { isCloudConfigured } from "../../cloud/supabaseClient";
 import {
   useCloudSession,
   signInWithGoogle,
   signOut,
 } from "../../cloud/session";
+
+import { dashboardOpenAtom } from "./Dashboard";
 
 /**
  * Personal Cloud login/logout menu entry. Renders nothing when Cloud isn't
@@ -17,6 +23,7 @@ import {
  */
 export const CloudAuthMenuItems: React.FC = () => {
   const { status, session } = useCloudSession();
+  const setDashboardOpen = useSetAtom(dashboardOpenAtom);
 
   if (!isCloudConfigured || status === "loading") {
     return null;
@@ -27,6 +34,12 @@ export const CloudAuthMenuItems: React.FC = () => {
     return (
       <>
         <MainMenu.Separator />
+        <MainMenu.Item
+          icon={LibraryIcon}
+          onSelect={() => setDashboardOpen(true)}
+        >
+          내 그림
+        </MainMenu.Item>
         <MainMenu.Item
           icon={loginIcon}
           onSelect={() => {

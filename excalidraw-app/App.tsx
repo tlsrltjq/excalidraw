@@ -101,6 +101,7 @@ import Collab, {
 } from "./collab/Collab";
 import { AppFooter } from "./components/AppFooter";
 import { AppMainMenu } from "./components/AppMainMenu";
+import { Dashboard } from "./components/cloud/Dashboard";
 import { AppWelcomeScreen } from "./components/AppWelcomeScreen";
 import {
   ExportToExcalidrawPlus,
@@ -1082,6 +1083,8 @@ const ExcalidrawWrapper = () => {
         {excalidrawAPI && !isCollabDisabled && (
           <Collab excalidrawAPI={excalidrawAPI} />
         )}
+
+        <Dashboard excalidrawAPI={excalidrawAPI} />
 
         <ShareDialog
           collabAPI={collabAPI}

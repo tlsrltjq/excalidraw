@@ -259,13 +259,20 @@ Milestone 2 체크리스트 전 항목이 완료됐다. **완료 조건 충족**
 
 ## Milestone 3: Cloud Workspace
 
-- [ ] `drawings` table과 RLS migration 작성
-- [ ] 그림 생성, 목록, 이름 변경, 삭제 API 작성
-- [ ] Dashboard 구현
-- [ ] URL에 현재 `drawingId` 표현
-- [ ] 새 그림의 유효한 초기 Excalidraw scene 생성
-- [ ] Cloud scene 로딩 시 Excalidraw restore API 사용
-- [ ] 다른 사용자의 drawing 접근 차단 테스트
+- [x] `drawings` table과 RLS migration 작성 (SQL 작성 완료, 실제 DB 적용은 사용자가
+  SQL Editor에서 실행해야 함 — 아래 기록)
+- [x] 그림 생성, 목록, 이름 변경, 삭제 API 작성 (`excalidraw-app/cloud/drawings.ts`)
+- [x] Dashboard 구현 (`excalidraw-app/components/cloud/Dashboard.tsx`, 메인 메뉴
+  "내 그림"에서 열림, 로그인 시에만 노출)
+- [x] URL에 현재 `drawingId` 표현 (D-006: `?drawing=<uuid>`,
+  `excalidraw-app/cloud/urlDrawingId.ts`)
+- [x] 새 그림의 유효한 초기 Excalidraw scene 생성 (`serializeAsJSON([], ..., "database")`
+  기반, 임의 JSON 아님)
+- [x] Cloud scene 로딩 시 Excalidraw restore API 사용 (`restoreElements`/
+  `restoreAppState` + `updateScene({ captureUpdate: IMMEDIATELY })`, 기존
+  `initializeScene`의 backend-import 패턴과 동일)
+- [ ] 다른 사용자의 drawing 접근 차단 테스트 (migration 적용 + 계정 2개 필요 —
+  사용자가 직접)
 
 권장 초기 schema:
 
@@ -283,6 +290,56 @@ drawings
 `owner_id`는 가능하면 DB에서 `auth.uid()`를 기본값으로 설정해 클라이언트가임의 사용자 ID를 전달하지 않게 한다.
 
 완료 조건: 로그인한 사용자가 본인 그림만 생성하고 열고 삭제할 수 있다.
+
+### 2026-08-19 Milestone 3 코드 구현 기록
+
+계정/DB 적용이 필요 없는 부분(설계 결정, 코드)을 먼저 구현했다.
+
+- **D-005 결정** (`personal-cloud-docs/DECISIONS.md`): scene은 RLS로 보호된
+  PostgreSQL에 평문 저장 (선택지 A). Milestone 9(AI Gateway)/11(MCP)이 scene을
+  읽고 조작해야 하므로 클라이언트 암호화(B)는 그 경로를 막는다.
+- **D-006 결정**: `?drawing=<uuid>` query parameter. `excalidraw-app`에 router가
+  없어 path route(`/drawings/<uuid>`)는 새 dependency + `vercel.json` rewrite가
+  필요해 범위가 커진다. 기존 예약 흐름(`?id`, `#json=`, `#room=`, `#url=`)과
+  충돌 없음.
+- `supabase/migrations/20260819130357_create_drawings_table.sql`: `drawings`
+  table, RLS enable, select/insert/update/delete 4개 policy(모두
+  `auth.uid() = owner_id`), `updated_at` 자동 갱신 trigger를 한 파일에 작성.
+  `check-guardrails.mjs`가 RLS 관련 경고 없이 통과함을 확인했다.
+- `excalidraw-app/cloud/types.ts`, `drawings.ts`: `listDrawings`,
+  `createDrawing`, `renameDrawing`, `deleteDrawing`, `getDrawing`. 전부
+  Cloud 미설정 시 명시적으로 throw하고(호출자가 처리), `owner_id`는 절대
+  클라이언트에서 설정하지 않는다 — DB 컬럼 default(`auth.uid()`)에 맡긴다.
+- `excalidraw-app/cloud/urlDrawingId.ts`: `location.search`의 `drawing` 파라미터만
+  다루고 hash는 건드리지 않는다.
+- `excalidraw-app/components/cloud/Dashboard.tsx`: 목록/생성/이름변경/삭제/열기
+  다이얼로그. 로그인 안 됐거나 다이얼로그가 닫혀 있어도, 로그인 상태가 확인되고
+  URL에 `?drawing=`이 있으면 자동으로 그 그림을 불러온다(딱 한 번, silent) —
+  D-006에서 URL로 표현하기로 한 것을 실제로 의미 있게 만드는 부분이다.
+- `excalidraw-app/components/AppMainMenu.tsx`: 로그인 시에만 "내 그림" 메뉴 항목
+  추가 (`CloudAuthMenuItems.tsx`).
+- **리팩터링**: Milestone 2의 `useCloudSession()`이 컴포넌트마다 각자
+  `getSession`/`onAuthStateChange` 구독을 새로 만들던 걸, Dashboard도 세션이
+  필요해지면서 모듈 스코프에서 단 한 번만 구독하도록 `excalidraw-app/cloud/session.ts`를
+  정리했다 (여러 컴포넌트가 같은 구독을 나눠 쓰는 게 아니라 각자 만드는 중복을
+  없앰).
+- **검증**: `yarn test:typecheck`, `yarn test:code`(eslint), `yarn test:app`
+  (121 files, 1858 tests, 베이스라인과 동일) 전부 통과. 로컬 dev 서버에서 로그인
+  안 된 상태로 메뉴를 열어 "내 그림" 항목이 없고 console error도 없음을 확인—
+  로그인/DB가 필요한 실제 생성·목록·열기·삭제 흐름과 "다른 사용자의 drawing
+  접근 차단 테스트"는 migration을 실제 DB에 적용하고 사용자가 로그인해야 확인
+  가능하다.
+
+**남은 것 (사용자가 직접)**:
+
+1. Supabase Dashboard → SQL Editor에
+   `supabase/migrations/20260819130357_create_drawings_table.sql` 내용을
+   붙여넣어 실행 (또는 Supabase CLI로 `supabase db push`).
+2. 배포 주소 또는 localhost에서 로그인 → 메뉴 "내 그림" → 새 그림 만들기 →
+   목록에 뜨는지 → 이름 변경 → 열기(그림이 캔버스에 로드되는지) → 삭제까지
+   전체 흐름 확인.
+3. (권장) 두 번째 Google 계정으로 로그인해서 첫 번째 계정의 그림이 안 보이는지
+   확인 — RLS가 실제로 막는지 검증.
 
 ## Milestone 4: 문서별 로컬 초안과 Cloud Save
 
