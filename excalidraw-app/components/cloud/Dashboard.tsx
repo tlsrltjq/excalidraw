@@ -12,12 +12,14 @@ import { TextField } from "@excalidraw/excalidraw/components/TextField";
 import {
   PlusIcon,
   TrashIcon,
+  exportToFileIcon,
   pencilIcon,
 } from "@excalidraw/excalidraw/components/icons";
 import {
   restoreAppState,
   restoreElements,
 } from "@excalidraw/excalidraw/data/restore";
+import { serializeAsJSON } from "@excalidraw/excalidraw/data/json";
 import { CaptureUpdateAction } from "@excalidraw/excalidraw";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -76,6 +78,7 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
   const [drawings, setDrawings] = useState<CloudDrawingSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -151,6 +154,33 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
     }
   };
 
+  const handleSaveCurrent = async () => {
+    if (!excalidrawAPI) {
+      return;
+    }
+    const title = window.prompt("그림 이름을 입력하세요", "제목 없는 그림");
+    if (title === null) {
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const elements = excalidrawAPI.getSceneElements();
+      const appState = excalidrawAPI.getAppState();
+      const files = excalidrawAPI.getFiles();
+      const sceneData = JSON.parse(
+        serializeAsJSON(elements, appState, files, "database"),
+      );
+      const drawing = await createDrawing(title || "제목 없는 그림", sceneData);
+      setDrawingIdInUrl(drawing.id);
+      await refresh();
+    } catch (e: any) {
+      setError(e?.message ?? String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleOpen = async (id: string) => {
     if (!excalidrawAPI) {
       return;
@@ -216,6 +246,13 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
     <Dialog size="regular" onCloseRequest={handleClose} title="내 그림">
       <div className="personal-cloud-dashboard">
         <div className="personal-cloud-dashboard__toolbar">
+          <FilledButton
+            variant="outlined"
+            label="현재 캔버스를 새 그림으로 저장"
+            icon={exportToFileIcon}
+            onClick={handleSaveCurrent}
+            disabled={saving || !excalidrawAPI}
+          />
           <FilledButton
             label="새 그림 만들기"
             icon={PlusIcon}

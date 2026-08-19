@@ -79,13 +79,22 @@ export const listDrawings = async (): Promise<CloudDrawingSummary[]> => {
   }));
 };
 
+/**
+ * Creates a new drawing. Pass `sceneData` to seed it from an existing scene
+ * (e.g. "save the canvas I'm looking at as a new Cloud drawing") — omit it
+ * to get a fresh empty scene. This always INSERTs a new row; there's no
+ * "update the drawing I currently have open" yet (that's the autosave
+ * coordinator in Milestone 4), so calling this repeatedly creates that many
+ * separate drawings.
+ */
 export const createDrawing = async (
   title: string = "제목 없는 그림",
+  sceneData?: CloudSceneData,
 ): Promise<CloudDrawing> => {
   const client = requireClient();
   const { data, error } = await client
     .from(TABLE)
-    .insert({ title, scene_data: createEmptyCloudScene() })
+    .insert({ title, scene_data: sceneData ?? createEmptyCloudScene() })
     .select("id, owner_id, title, scene_data, revision, created_at, updated_at")
     .single();
 
