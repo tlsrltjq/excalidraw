@@ -94,13 +94,37 @@ Port:   3001 (.env.development)
 
 ## Milestone 1: Branch와 Baseline 배포
 
-- [ ] `personal-cloud` 브랜치 생성
-- [ ] 개인 Fork에 브랜치 push
-- [ ] Vercel 프로젝트 연결
-- [ ] Production Branch를 `personal-cloud`로 설정
-- [ ] PC와 iPad에서 배포 주소 확인
-- [ ] 폰트, PWA, Export, Local Save 확인
-- [ ] `vercel.json`의 upstream 전용 redirect/header 검토
+- [x] `personal-cloud` 브랜치 생성
+- [x] 개인 Fork에 브랜치 push
+- [x] Vercel 프로젝트 연결 (`personal-excalidraw`, source: `personal-cloud`)
+- [x] Production Branch를 `personal-cloud`로 설정 (Environment: Production, Current)
+- [x] 배포 주소에서 자동화 브라우저로 렌더링/폰트/PWA/Export 확인 (아래 기록)
+- [x] PC와 iPad 실제 브라우저에서 최종 확인 (사용자 확인, 2026-08-19)
+- [x] Local Save를 실제 foreground 탭에서 확인 (사용자 확인, 2026-08-19)
+- [x] `vercel.json`의 upstream 전용 redirect/header 검토 (D-010: 현재는 무해하므로 미변경)
+
+배포 주소 (2026-08-19 확인):
+
+```text
+Production: https://personal-excalidraw.vercel.app
+```
+
+### 2026-08-19 배포 주소 자동 확인 기록
+
+Claude Code 브라우저 도구로 `https://personal-excalidraw.vercel.app`을 직접 열어 확인했다.
+
+- 캔버스 렌더링, 한글 UI, Virgil 로고 폰트 정상.
+- 사각형 생성/선택 정상, console error 없음 (`Feature-Policy: *` 헤더에 대한 브라우저 경고만 존재 — `vercel.json`의 upstream 전용 값, D-010 참고).
+- 메뉴 → 이미지 내보내기 다이얼로그 정상 (PNG/SVG 미리보기, 배경/다크모드/크기 옵션 정상). 실제 파일 다운로드는 사용자 승인이 필요한 동작이라 실행하지 않음.
+- PWA: `/manifest.webmanifest` 200 응답, `sw.js` service worker 등록 확인.
+- **Local Save는 이 자동화 브라우저로 검증 불가**: 이 브라우저 pane은 `document.hidden === true`(background tab 취급)를 보고하고, `LocalData.isSavePaused()`가 `document.hidden || locker.isLocked()`를 체크하므로 저장이 항상 스킵된다. 로컬 dev 서버(`yarn start`)에서도 동일 현상을 재현했고, `document.hidden`을 스크립트로 강제로 `false`로 바꾸자 즉시 `excalidraw`/`excalidraw-state` 키가 정상 저장됐다. 즉 저장 로직 자체는 정상이며, 이번에 발견한 건 자동화 브라우저 도구의 한계다 (실사용자의 foreground 탭에서는 재현되지 않음).
+- 결론: 렌더링/폰트/PWA/Export는 자동 확인 완료. **Local Save와 PC/iPad 실기기 확인은 사용자가 직접** 배포 주소에서 사각형을 그리고 새로고침해 복구되는지 확인해야 로드맵 체크리스트를 완전히 닫을 수 있다.
+
+### 2026-08-19 사용자 실기기 확인 기록
+
+사용자가 실제 PC/iPad 브라우저에서 배포 주소를 열어 확인했다. Local Save(새로고침 후 복구)와 파일 다운로드(PNG/SVG/Excalidraw export) 모두 문제없이 동작했다. 이로써 Milestone 1의 남은 항목이 모두 닫혔다.
+
+**완료 조건 충족**: 노트북이 꺼져도 배포된 원본 Excalidraw에 접속할 수 있다.
 
 CORS는 같은 origin 앱을 보호하는 설정이 아니다. 전역
 `Access-Control-Allow-Origin`을 개인 배포 URL로 단순 치환하지 않고 실제로

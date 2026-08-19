@@ -61,3 +61,23 @@
 - 상태: 초안
 - 결정: 초기에는 standalone Socket.IO 서버를 실행하기 쉬운 WebSocket host를 사용한다.
 - 고려사항: 무료 host는 sleep과 재시작이 있으므로 재연결 UX가 필요하다.
+
+## D-010: Baseline `vercel.json`의 upstream 전용 규칙 처리
+
+- 상태: 결정
+- 결정: Milestone 1 baseline 배포 시점에는 `vercel.json`을 수정하지 않고 upstream 그대로 유지한다.
+- 근거:
+  - `/(.*)` 전역 `Access-Control-Allow-Origin: https://excalidraw.com` 헤더는 excalidraw.com이
+    자기 자신의 배포 asset을 다른 excalidraw 서브도메인/embed에서 cross-origin으로 읽을 때
+    쓰는 규칙이다. 개인 배포 도메인은 `https://excalidraw.com`이 아니므로 이 값은 어떤
+    origin에도 실질적 접근 권한을 주지 않는다. 무해하지만 의미가 없는 leftover다.
+  - ROADMAP이 경고하는 실수는 "이 값을 개인 배포 URL로 단순 치환"하는 것이다. 치환하면
+    "개인 배포 자기 자신"이 자기 자신의 asset을 cross-origin으로 읽도록 허용하는 것과
+    같아 의미가 없고, 실제로 cross-origin 접근이 필요한 시점(예: 다른 도메인에서 폰트나
+    embed를 가져가야 하는 경우)이 아니면 만들 필요가 없는 규칙이다.
+  - `/webex/*` redirect와 `vscode.excalidraw.com` host 기반 redirect는 특정 path/host에만
+    반응하므로 개인 배포에서는 트리거되지 않는다. 무해하다.
+  - `outputDirectory`, `installCommand`는 개인 배포에도 그대로 유효하다.
+- 영향: 지금은 변경하지 않는다. 개인 도메인에서 실제로 cross-origin 접근이 필요한 asset이
+  생기면(예: 외부 사이트에 embed 위젯 제공) 그때 해당 asset에만 좁게 CORS 헤더를 추가하고
+  이 문서에 갱신한다. 전역 규칙을 유지/재사용하지 않는다.
