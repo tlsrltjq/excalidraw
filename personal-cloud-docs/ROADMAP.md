@@ -137,9 +137,10 @@ CORS는 같은 origin 앱을 보호하는 설정이 아니다. 전역 `Access-Co
 - [x] Google OAuth 로그인/로그아웃 구현 (`excalidraw-app/components/cloud/CloudAuthMenuItems.tsx`, 메인 메뉴에 통합)
 - [x] session restore 구현 (`excalidraw-app/cloud/session.ts` — `getSession` + `onAuthStateChange`)
 - [x] 익명 사용자의 기존 local-first 편집 유지 (아래 코드 레벨 확인 기록)
-- [ ] OAuth redirect URL을 개발/운영 주소로 제한 (Supabase Authentication → URL
-  Configuration — Site URL/Redirect URLs에 `http://localhost:3001`,
-  `https://personal-excalidraw.vercel.app` 등록 확인 필요, 아직 미확인)
+- [x] OAuth redirect URL을 개발/운영 주소로 제한 (Site URL:
+  `https://personal-excalidraw.vercel.app`; Redirect URLs: `http://localhost:3001`,
+  `https://personal-excalidraw.vercel.app` — 와일드카드 없이 정확한 origin만 등록,
+  사용자 확인 완료 2026-08-19)
 
 프론트엔드 허용 환경변수:
 
@@ -242,6 +243,19 @@ Supabase Authentication → URL Configuration에서 Site URL/Redirect URLs를
 제한했는지는 아직 사용자가 확인하지 않았다. 지금 상태로도 로그인은 동작했지만,
 redirect URL을 열어두면(와일드카드 등) 다른 도메인으로 세션 토큰이 새어나가는
 open-redirect 위험이 있으므로 프로덕션 배포 전에는 반드시 좁혀야 한다.
+
+### 2026-08-19 URL Configuration 확인 — Milestone 2 완료
+
+원래 Site URL이 기본값 `http://localhost:3000`(실제 dev 포트 3001과도 다르고
+배포 주소도 아님)으로 방치돼 있었고 Redirect URLs는 비어 있었다. 아래로
+수정하고 사용자가 저장/새로고침까지 확인했다:
+
+- Site URL: `https://personal-excalidraw.vercel.app`
+- Redirect URLs: `http://localhost:3001`, `https://personal-excalidraw.vercel.app`
+  (와일드카드 미사용, 정확한 origin 2개만 등록)
+
+Milestone 2 체크리스트 전 항목이 완료됐다. **완료 조건 충족**: 로그인과
+로그아웃 후에도 익명/로그인 사용 흐름이 각각 정상이다.
 
 ## Milestone 3: Cloud Workspace
 
