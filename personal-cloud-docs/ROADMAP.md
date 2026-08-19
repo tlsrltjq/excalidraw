@@ -274,6 +274,34 @@ Milestone 2 체크리스트 전 항목이 완료됐다. **완료 조건 충족**
 - [ ] 다른 사용자의 drawing 접근 차단 테스트 (migration 적용 + 계정 2개 필요 —
   사용자가 직접)
 
+### 2026-08-19 실사용 테스트 중 발견한 버그 2건 + 수정
+
+1. **`origin/personal-cloud`에 push가 안 돼 있었음**: Milestone 2/3 커밋을 전부
+   로컬에만 만들어두고 push를 안 해서, Vercel Production은 계속 Milestone 1
+   상태(`585dfab`)로 빌드되고 있었다. 그래서 배포 주소에 "Google로 로그인"
+   메뉴 자체가 없었다. `git push origin personal-cloud`로 해결. **교훈: 이
+   프로젝트에서는 커밋 후 바로 push까지 한다** (배포 지연을 막기 위해).
+2. **`.env.local`은 Vercel 빌드에 안 들어감**: `.env.local`은 의도적으로
+   gitignore돼 있어서 로컬 dev 서버에서만 보이고, Vercel은 git 저장소만 보고
+   빌드하므로 프로덕션 빌드에 Cloud 환경변수가 전혀 없었다. Vercel Dashboard →
+   Settings → Environment Variables에 `VITE_SUPABASE_URL`,
+   `VITE_SUPABASE_PUBLISHABLE_KEY`를 Production 환경으로 직접 등록(사용자가
+   git과 무관하게 직접 입력)하고 Redeploy해서 해결.
+3. **`permission denied for table drawings`**: Supabase 프로젝트 생성 시
+   "Automatically expose new tables"를 껐기 때문에, RLS policy와는 별개로
+   `authenticated` 역할에 테이블 GRANT가 없어서 모든 요청이 RLS 평가 전에
+   막혔다. `supabase/migrations/20260819140000_grant_drawings_table.sql`로
+   `grant select, insert, update, delete on public.drawings to authenticated;`
+   추가해 해결.
+
+추가로, 사용자 요청으로 **"현재 캔버스를 새 그림으로 저장"** 버튼을 Dashboard에
+추가했다 (`createDrawing`이 이제 기존 scene을 받아 그걸로 새 row를 만들 수
+있음). 이건 수동 1회성 저장이고, autosave(같은 그림을 계속 갱신)는 아직 아니다
+— 그건 Milestone 4다.
+
+**사용자 확인**: 위 수정 후 그림 저장/목록/이름변경/열기/삭제 전체 흐름이
+정상 동작함을 확인했다 (2026-08-19). 남은 건 다른 계정으로 RLS 교차 테스트뿐이다.
+
 권장 초기 schema:
 
 ```text
