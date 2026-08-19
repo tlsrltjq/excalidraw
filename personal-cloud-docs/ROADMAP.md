@@ -130,7 +130,7 @@ CORS는 같은 origin 앱을 보호하는 설정이 아니다. 전역 `Access-Co
 
 ## Milestone 2: Supabase 기반과 인증
 
-- [ ] Supabase 프로젝트 생성 (사용자가 직접 — 계정/프로젝트 생성은 에이전트가 대신할 수 없음)
+- [x] Supabase 프로젝트 생성 (사용자가 직접 생성. project: `personal-excalidraw`, org: `tlsrltjq's Org`, region: Seoul)
 - [x] SQL migration 디렉터리 추가 (`supabase/migrations/README.md`, 컨벤션만 — Milestone 3부터 실제 테이블)
 - [x] `@supabase/supabase-js`를 `excalidraw-app` workspace에 추가 (2.112.3)
 - [x] Supabase client와 환경변수 타입 추가 (`excalidraw-app/cloud/supabaseClient.ts`, `vite-env.d.ts`)
@@ -182,6 +182,40 @@ Supabase 프로젝트가 아직 없는 상태에서 계정/인증이 필요 없�
     `http://localhost:3001`과 `https://personal-excalidraw.vercel.app`을 등록해야 한다.
   - Google Cloud Console에서 OAuth client의 Authorized redirect URI에 Supabase가 제공하는
     콜백 URL(`https://<project-ref>.supabase.co/auth/v1/callback`)을 등록해야 한다.
+
+### 2026-08-19 Supabase 프로젝트 생성 + 리다이렉트 확인
+
+사용자가 Supabase 프로젝트(`personal-excalidraw`, Seoul, "Automatically expose
+new tables" 해제 + "Enable automatic RLS" 활성화)를 생성했다. `.env.local`
+(gitignored, 리포 루트)에 실제 `VITE_SUPABASE_URL`과 `VITE_SUPABASE_PUBLISHABLE_KEY`를
+채워넣었다 — 이 값들이 저장된 위치는 Claude 메모리에도 기록해 다음 세션에서 재입력을
+요구하지 않게 했다. secret key(admin/service-role 동급)는 어디에도 저장하지 않았다 —
+브라우저 인증 흐름에는 필요 없다.
+
+로컬 dev 서버에서 확인:
+
+- Cloud 환경변수가 채워지자 메인 메뉴에 "Google로 로그인" 항목이 정확히 나타났다
+  (설정 전에는 항목 자체가 없었던 것과 대비됨 — `isCloudConfigured` 분기 정상 동작 확인).
+- 클릭 시 `signInWithGoogle()`이 Supabase authorize 엔드포인트
+  (`https://dtptyzwjhvuvrsguspic.supabase.co/auth/v1/authorize?provider=google&redirect_to=...`)로
+  정확히 리다이렉트했다. 즉 client 설정, 메뉴 연결, redirect 로직까지 코드 경로는
+  전부 정상이다.
+- 거기서 `{"code":400,"error_code":"validation_failed","msg":"Unsupported provider: provider is not enabled"}`
+  에러를 받았다 — 예상된 지점이다. Supabase Dashboard에서 아직 Google provider를
+  켜지 않았기 때문이다.
+
+**남은 것 (사용자가 직접 — OAuth 앱 등록/계정 인증은 에이전트가 대신할 수 없음)**:
+
+1. Google Cloud Console → OAuth client ID(Web application) 생성, Authorized
+   redirect URI에 `https://dtptyzwjhvuvrsguspic.supabase.co/auth/v1/callback` 등록.
+2. Supabase Dashboard → Authentication → Sign In / Providers → Google 활성화,
+   Client ID/Secret 입력.
+3. (권장) Authentication → URL Configuration에 `http://localhost:3001`,
+   `https://personal-excalidraw.vercel.app` 등록 — 이게 되면 로드맵의 "OAuth
+   redirect URL을 개발/운영 주소로 제한" 항목도 닫힌다.
+4. 완료되면 다시 로그인을 시도해 실제 Google 계정 선택 화면까지 뜨는지, 로그인 후
+   메뉴가 "로그아웃"으로 바뀌는지, 새로고침 후에도 로그인 상태가 유지되는지
+   (session restore) 확인한다.
 
 ## Milestone 3: Cloud Workspace
 
