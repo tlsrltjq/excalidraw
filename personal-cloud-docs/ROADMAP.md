@@ -137,7 +137,9 @@ CORS는 같은 origin 앱을 보호하는 설정이 아니다. 전역 `Access-Co
 - [x] Google OAuth 로그인/로그아웃 구현 (`excalidraw-app/components/cloud/CloudAuthMenuItems.tsx`, 메인 메뉴에 통합)
 - [x] session restore 구현 (`excalidraw-app/cloud/session.ts` — `getSession` + `onAuthStateChange`)
 - [x] 익명 사용자의 기존 local-first 편집 유지 (아래 코드 레벨 확인 기록)
-- [ ] OAuth redirect URL을 개발/운영 주소로 제한 (Supabase/Google Cloud Console 설정 — 사용자가 직접)
+- [ ] OAuth redirect URL을 개발/운영 주소로 제한 (Supabase Authentication → URL
+  Configuration — Site URL/Redirect URLs에 `http://localhost:3001`,
+  `https://personal-excalidraw.vercel.app` 등록 확인 필요, 아직 미확인)
 
 프론트엔드 허용 환경변수:
 
@@ -216,6 +218,30 @@ new tables" 해제 + "Enable automatic RLS" 활성화)를 생성했다. `.env.lo
 4. 완료되면 다시 로그인을 시도해 실제 Google 계정 선택 화면까지 뜨는지, 로그인 후
    메뉴가 "로그아웃"으로 바뀌는지, 새로고침 후에도 로그인 상태가 유지되는지
    (session restore) 확인한다.
+
+### 2026-08-19 Google provider 활성화 + 실제 로그인/로그아웃 확인
+
+사용자가 Google Cloud Console에서 OAuth client(Web application, redirect URI:
+`https://dtptyzwjhvuvrsguspic.supabase.co/auth/v1/callback`)를 만들고,
+Supabase Dashboard → Authentication → Providers → Google에 Client ID/Secret을
+입력한 뒤 활성화했다.
+
+Claude Code 브라우저로 재확인: 로그인 메뉴 클릭 시 이전의 400 에러 대신 실제
+Google 계정 로그인 화면(`accounts.google.com`)까지 정상적으로 도달했다
+("dtptyzwjhvuvrsguspic.supabase.co(으)로 이동" 문구로 콜백 대상도 정확함을
+확인). 이후 실제 계정 로그인은 에이전트가 대신할 수 없어 사용자가 직접
+진행했다.
+
+사용자 확인 결과: **로그인 성공, 로그아웃 시 메뉴가 다시 "Google로 로그인"으로
+정상 복귀함.** Milestone 2의 완료 조건("로그인과 로그아웃 후에도 익명/로그인
+사용 흐름이 각각 정상")을 충족했다.
+
+남은 항목은 "OAuth redirect URL을 개발/운영 주소로 제한" 하나뿐이다 —
+Supabase Authentication → URL Configuration에서 Site URL/Redirect URLs를
+`http://localhost:3001`, `https://personal-excalidraw.vercel.app`로 명시적으로
+제한했는지는 아직 사용자가 확인하지 않았다. 지금 상태로도 로그인은 동작했지만,
+redirect URL을 열어두면(와일드카드 등) 다른 도메인으로 세션 토큰이 새어나가는
+open-redirect 위험이 있으므로 프로덕션 배포 전에는 반드시 좁혀야 한다.
 
 ## Milestone 3: Cloud Workspace
 
