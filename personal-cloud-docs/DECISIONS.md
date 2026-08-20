@@ -141,3 +141,32 @@
   drawing/element가 참조하던 파일 청소)는 이번 결정 범위에 넣지 않고 별도
   유예 기간을 둔 작업으로 미룬다 (ENGINEERING_GUARDRAILS.md #9).
 - 결정일: 2026-08-19/20 (Milestone 5 migration 작성 시점)
+
+### Orphan file 정리 정책 (설계만, 실행 인프라는 별도 작업)
+
+지금 코드는 파일을 절대 능동적으로 지우지 않는다 (`fileAdapter.ts`는 업로드/
+다운로드만 하고 delete는 없음). 아래 두 종류의 orphan이 시간이 지나면서
+쌓인다.
+
+1. **그림이 삭제된 경우**: `drawing_files`는 `drawings`에 `on delete cascade`가
+   걸려 있어 metadata row는 자동으로 없어지지만, Storage object(실제 바이트)는
+   cascade 대상이 아니라서 그대로 남는다. → `storage.objects`를 순회하며
+   `drawing_files.storage_path`에 더 이상 존재하지 않는 경로를 찾아 지운다.
+   drawing 삭제 시점에는 metadata가 이미 사라졌으므로 grace period 없이 바로
+   지워도 안전하다 (참조할 대상 자체가 없다).
+2. **그림은 남아 있지만 이미지 element가 지워지거나 다른 파일로 교체된 경우**:
+   `drawing_files` row는 지금 로직상 계속 남는다 (저장은 upsert만 하고 delete는
+   안 하므로). → 주기적으로 각 `drawing_files` row의 `file_id`가 해당
+   `drawings.scene_data.elements`(삭제되지 않은 것)에 아직 참조되는지 확인하고,
+   **일정 유예 기간(예: 7일)** 이상 참조가 끊긴 상태가 유지된 것만 지운다.
+   즉시 지우지 않는 이유는 undo/히스토리, 혹은 Milestone 6의 최소 version
+   history가 예전 버전의 이미지를 다시 참조할 수 있기 때문이다
+   (ENGINEERING_GUARDRAILS.md #9).
+
+실행 방법은 아직 정하지 않았다 — 후보는 Supabase의 pg_cron + Edge Function
+(service role 필요, 브라우저 코드가 아니라 서버 쪽에서만 실행) 또는 수동으로
+가끔 실행하는 관리 스크립트다. 브라우저 클라이언트 코드에는 이 정리 로직을
+절대 넣지 않는다 — service role 없이는 다른 사용자의 orphan을 볼 권한도 없고,
+클라이언트가 "정리"를 자임하게 하면 진행 중인 다른 세션의 파일을 실수로 지울
+위험이 있다. 실제 구현은 이 정책이 실제로 필요해지는 시점(스토리지 용량이
+문제가 되거나 Milestone 6 MVP 검증 단계)에 별도로 진행한다.

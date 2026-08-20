@@ -438,17 +438,69 @@ saveState
 
 ## Milestone 5: 이미지와 파일
 
-- [ ] private Storage bucket 생성
-- [ ] 경로를 `<owner>/<drawing>/<file>`로 제한
-- [ ] `drawing_files` table과 RLS 작성
-- [ ] 파일의 drawing 소유권을 DB 정책에서 검증
-- [ ] BinaryFileData를 업로드 가능한 binary로 변환
-- [ ] 로딩 시 BinaryFileData와 data URL 복원
-- [ ] 신규/변경 파일만 업로드
-- [ ] 삭제된 파일 정리 정책 작성
-- [ ] 이미지 포함 Export와 복원 테스트
+- [x] private Storage bucket 생성 (migration SQL 작성 완료, 실제 DB 적용은
+  사용자가 SQL Editor에서 실행해야 함 — 아래 기록)
+- [x] 경로를 `<owner>/<drawing>/<file>`로 제한 (D-011)
+- [x] `drawing_files` table과 RLS 작성
+- [x] 파일의 drawing 소유권을 DB 정책에서 검증 (`drawing_files` insert/update
+  policy의 `EXISTS` 서브쿼리)
+- [x] BinaryFileData를 업로드 가능한 binary로 변환 (`dataURLToFile`)
+- [x] 로딩 시 BinaryFileData와 data URL 복원 (`getDataURL`)
+- [x] 신규/변경 파일만 업로드 (`FileManager`의 버전 기반 dedup 재사용)
+- [x] 삭제된 파일 정리 정책 작성 (D-011 "Orphan file 정리 정책" — 설계만,
+  실행 인프라(cron/Edge Function)는 별도 작업으로 의도적으로 미룸)
+- [ ] 이미지 포함 Export와 복원 테스트 (migration 적용 + 실제 이미지 업로드
+  필요 — 사용자가 직접)
 
 완료 조건: 이미지가 포함된 그림도 다른 기기에서 동일하게 열린다.
+
+### 2026-08-19/20 구현 기록
+
+계정/DB 적용이 필요 없는 부분을 먼저 구현했다 (Milestone 2/3/4와 같은 패턴).
+
+- **D-011 결정**: `drawing-files` private bucket, 경로
+  `<owner_id>/<drawing_id>/<file_id>`, `drawing_files` metadata table, 파일도
+  scene과 동일하게 평문 저장(D-005 연장). Orphan 정리는 설계만 하고 실행은
+  미룸.
+- `supabase/migrations/20260820140250_create_drawing_files_storage.sql`:
+  bucket 생성(`insert into storage.buckets`), `drawing_files` table + RLS(부모
+  drawing 소유권까지 확인), `storage.objects`에 대한 4개 RLS policy
+  (`storage.foldername(name)[1] = auth.uid()`), `drawing_files`에 대한 명시적
+  GRANT (drawings table 때와 같은 이유 — "Automatically expose new tables"
+  꺼져 있음). `storage.objects`/`storage.buckets` 자체는 Storage 확장이 이미
+  기본 권한을 갖고 있어 별도 GRANT가 필요 없다.
+- `excalidraw-app/cloud/fileAdapter.ts`: `createCloudFileManager(drawingId)`가
+  `excalidraw-app/data/FileManager.ts`(기존 local-first가 쓰는 것과 같은
+  base class)를 Supabase Storage + `drawing_files`에 연결한 인스턴스를
+  만든다. 버전 기반 dedup을 그대로 물려받아 "신규/변경 파일만 업로드"를
+  별도 로직 없이 만족한다. 그림마다 새 인스턴스를 만든다 — 경로에
+  `drawingId`가 박혀 있어서 인스턴스를 공유하면 전환 중 업로드가 엉뚱한
+  그림 폴더로 들어갈 위험이 있다.
+- `excalidraw-app/cloud/autosave.ts`: scene 저장이 성공한 직후 (별도 상태로)
+  `currentFileManager.saveFiles(...)` 호출. 실패해도 scene "저장됨" 상태를
+  되돌리지 않는다(guardrail #9 — scene 저장과 파일 업로드는 별도 상태).
+- `excalidraw-app/cloud/openDrawing.ts`: scene 복원 후 이미지 element가
+  참조하는 fileId를 모아 다운로드하고 `excalidrawAPI.addFiles()`로 채운다.
+  다운로드가 끝나기 전에 사용자가 다른 그림으로 넘어갔으면(`generation`/
+  `drawingId` 재확인) 결과를 버린다 — scene 저장/열기와 같은 stale-response
+  방어(guardrail #5).
+- `excalidraw-app/App.tsx`: 기존 `beforeunload`의 "저장 중 파일 있으면 닫기
+  경고" 체크에 Cloud file manager도 OR로 추가.
+- **검증**: `yarn test:typecheck`, `yarn test:code`(eslint), `yarn test:app`
+  (121 files, 1858 tests, 베이스라인과 동일), `check-guardrails.mjs` 전부
+  통과. 로컬 dev 서버로 앱이 정상 기동하고 console error가 없음을 확인—
+  Cloud 그림을 안 열면 새 코드가 전혀 개입하지 않는다.
+
+**남은 것 (사용자가 직접)**:
+
+1. Supabase SQL Editor에서
+   `supabase/migrations/20260820140250_create_drawing_files_storage.sql`
+   실행.
+2. 로그인 → 그림 열기 → 이미지 붙여넣기/삽입 → 몇 초 뒤 저장되는지, 새로고침
+   또는 다른 기기에서 열었을 때 이미지가 그대로 보이는지 확인.
+3. Supabase Dashboard → Storage → `drawing-files` 버킷에
+   `<내 uid>/<drawing id>/<file id>` 형태로 object가 생겼는지, Table Editor에
+   `drawing_files` row가 같이 생겼는지 확인.
 
 ## Milestone 6: MVP 검증과 복구
 
