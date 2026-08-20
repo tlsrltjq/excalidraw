@@ -110,3 +110,34 @@
   - `/webex/*` redirect와 `vscode.excalidraw.com` host 기반 redirect는 특정 path/host에만반응하므로 개인 배포에서는 트리거되지 않는다. 무해하다.
   - `outputDirectory`, `installCommand`는 개인 배포에도 그대로 유효하다.
 - 영향: 지금은 변경하지 않는다. 개인 도메인에서 실제로 cross-origin 접근이 필요한 asset이생기면(예: 외부 사이트에 embed 위젯 제공) 그때 해당 asset에만 좁게 CORS 헤더를 추가하고이 문서에 갱신한다. 전역 규칙을 유지/재사용하지 않는다.
+
+## D-011: 이미지/파일 저장 경로와 접근 제어
+
+- 상태: 결정
+- 결정:
+  - private Storage bucket(`drawing-files`) 하나를 쓰고, 경로는
+    `<owner_id>/<drawing_id>/<file_id>`로 고정한다 (ROADMAP Milestone 5 권장안).
+  - 파일 metadata(`file_id`, `drawing_id`, `owner_id`, `mime_type`,
+    `storage_path`)는 별도 `drawing_files` table에 저장한다 — binary 자체가
+    아니라 "이 drawing이 이 file을 참조한다"는 사실과 복원에 필요한 mimeType을
+    관계형으로 추적하기 위해서다 (Storage의 object 자체에는 구조화 조회가 안 됨).
+  - scene_data와 마찬가지로 D-005 연장선에서 파일도 클라이언트 암호화 없이
+    RLS로 보호되는 private bucket에 평문으로 저장한다. 근거도 동일하다 —
+    Milestone 9/11(AI Gateway/MCP)이 이미지를 읽어야 할 수 있다.
+- 근거:
+  - path에 `owner_id`를 포함하면 Storage RLS policy가
+    `(storage.foldername(name))[1] = auth.uid()::text`만으로 접근 제어를
+    검증할 수 있어 policy가 단순해진다.
+  - `drawing_files` row 없이 Storage object만으로는 어떤 drawing이 그 파일을
+    쓰는지, mimeType이 뭔지 관계형으로 알 수 없어 복원(`getFiles`)과 orphan
+    정리가 어려워진다.
+  - `drawing_files`의 RLS는 `owner_id = auth.uid()`뿐 아니라 참조하는
+    `drawing_id`가 실제로 그 사용자 소유인지도 `EXISTS` 서브쿼리로 검증한다
+    (ENGINEERING_GUARDRAILS.md #12: "child row의 owner_id만 믿지 않고 parent
+    drawing 소유권을 확인") — 그렇지 않으면 자기 소유가 아닌 drawing_id에
+    자기 소유의 file row를 끼워 넣는 게 가능해진다.
+- 영향: `excalidraw-app/cloud/fileAdapter.ts`가 이 경로 규칙과 두 RLS 경계
+  (table + storage.objects)를 모두 전제로 구현된다. orphan file 정리(삭제된
+  drawing/element가 참조하던 파일 청소)는 이번 결정 범위에 넣지 않고 별도
+  유예 기간을 둔 작업으로 미룬다 (ENGINEERING_GUARDRAILS.md #9).
+- 결정일: 2026-08-19/20 (Milestone 5 migration 작성 시점)
