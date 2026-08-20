@@ -103,7 +103,11 @@ import { AppFooter } from "./components/AppFooter";
 import { AppMainMenu } from "./components/AppMainMenu";
 import { Dashboard } from "./components/cloud/Dashboard";
 import { CloudSaveStatus } from "./components/cloud/CloudSaveStatus";
-import { flushAutosave, scheduleAutosave } from "./cloud/autosave";
+import {
+  flushAutosave,
+  getCurrentFileManager,
+  scheduleAutosave,
+} from "./cloud/autosave";
 import { isCloudConfigured } from "./cloud/supabaseClient";
 import { AppWelcomeScreen } from "./components/AppWelcomeScreen";
 import {
@@ -700,9 +704,12 @@ const ExcalidrawWrapper = () => {
 
       if (
         excalidrawAPI &&
-        LocalData.fileStorage.shouldPreventUnload(
+        (LocalData.fileStorage.shouldPreventUnload(
           excalidrawAPI.getSceneElements(),
-        )
+        ) ||
+          getCurrentFileManager()?.shouldPreventUnload(
+            excalidrawAPI.getSceneElements(),
+          ))
       ) {
         if (import.meta.env.VITE_APP_DISABLE_PREVENT_UNLOAD !== "true") {
           preventUnload(event);

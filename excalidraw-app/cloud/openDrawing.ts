@@ -1,6 +1,7 @@
 /**
  * Personal Excalidraw Cloud — shared "load a Cloud drawing into the editor"
- * logic (Milestone 4). Used by the Dashboard (open / create / save-current)
+ * logic (Milestone 4 scene restore, Milestone 5 adds downloading the
+ * drawing's images). Used by the Dashboard (open / create / save-current)
  * and by the save-status conflict UI (원격 새로고침).
  */
 import {
@@ -9,8 +10,9 @@ import {
 } from "@excalidraw/excalidraw/data/restore";
 import { serializeAsJSON } from "@excalidraw/excalidraw/data/json";
 import { CaptureUpdateAction } from "@excalidraw/excalidraw";
+import { isInitializedImageElement } from "@excalidraw/element";
 
-import type { ExcalidrawElement } from "@excalidraw/element/types";
+import type { ExcalidrawElement, FileId } from "@excalidraw/element/types";
 import type {
   BinaryFiles,
   ExcalidrawImperativeAPI,
@@ -20,12 +22,13 @@ import { appJotaiStore } from "../app-jotai";
 
 import {
   flushAutosave,
+  getCurrentFileManager,
   localDraftPromptAtom,
   pauseAutosave,
   primeAutosaveBaseline,
   resumeAutosave,
 } from "./autosave";
-import { setCurrentDrawing } from "./currentDrawing";
+import { getCurrentDrawing, setCurrentDrawing } from "./currentDrawing";
 import { getLocalDraft } from "./localDraftStore";
 import { setDrawingIdInUrl } from "./urlDrawingId";
 
@@ -75,6 +78,43 @@ export const openCloudDrawing = (
   setTimeout(resumeAutosave, 0);
 
   void checkForNewerLocalDraft(drawing.id, restoredElements, restoredAppState);
+  void loadDrawingImages(excalidrawAPI, drawing.id, restoredElements);
+};
+
+/**
+ * Downloads whatever images `elements` reference (via the file manager
+ * `primeAutosaveBaseline` just created for this drawing) and adds them to
+ * the editor. Runs after the scene is already on screen — elements render
+ * with their "pending" placeholder until this resolves, same as the
+ * existing local-first image loading path.
+ */
+const loadDrawingImages = async (
+  excalidrawAPI: ExcalidrawImperativeAPI,
+  drawingId: string,
+  elements: readonly ExcalidrawElement[],
+) => {
+  const fileIds = elements.reduce<FileId[]>((acc, element) => {
+    if (isInitializedImageElement(element)) {
+      acc.push(element.fileId);
+    }
+    return acc;
+  }, []);
+
+  if (!fileIds.length) {
+    return;
+  }
+
+  const fileManager = getCurrentFileManager();
+  // the user may have already switched drawings by the time this resolves
+  // (guardrail #5) — bail rather than add stale images to whatever's open now.
+  if (!fileManager || getCurrentDrawing().drawingId !== drawingId) {
+    return;
+  }
+
+  const { loadedFiles } = await fileManager.getFiles(fileIds);
+  if (loadedFiles.length && getCurrentDrawing().drawingId === drawingId) {
+    excalidrawAPI.addFiles(loadedFiles);
+  }
 };
 
 /**

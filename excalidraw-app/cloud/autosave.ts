@@ -1,5 +1,7 @@
 /**
- * Personal Excalidraw Cloud — autosave coordinator (Milestone 4).
+ * Personal Excalidraw Cloud — autosave coordinator (Milestone 4 scene
+ * autosave, Milestone 5 adds the per-drawing file upload after each
+ * successful scene save).
  *
  * Called from `onChange` (a hot path — ENGINEERING_GUARDRAILS.md #4), so
  * this file never does network/serialize work synchronously on every call.
@@ -23,8 +25,11 @@ import { Locker } from "../data/Locker";
 
 import { getCurrentDrawing } from "./currentDrawing";
 import { updateDrawingScene } from "./drawings";
+import { createCloudFileManager } from "./fileAdapter";
 import { clearLocalDraft, saveLocalDraft } from "./localDraftStore";
 import { isCloudConfigured } from "./supabaseClient";
+
+import type { FileManager } from "../data/FileManager";
 
 import type { CloudAppState } from "./types";
 
@@ -76,6 +81,13 @@ let latestSnapshot: Snapshot | null = null;
 let inFlight = false;
 let retryQueued = false;
 
+/**
+ * One `FileManager` per open drawing (see `fileAdapter.ts` for why it's
+ * not a shared singleton), (re)created in `primeAutosaveBaseline`.
+ */
+let currentFileManager: FileManager | null = null;
+export const getCurrentFileManager = () => currentFileManager;
+
 type LockReason = "loading";
 const locker = new Locker<LockReason>();
 
@@ -102,6 +114,7 @@ export const primeAutosaveBaseline = (
     serialized: serializeAsJSON(elements, appState, files, "database"),
   };
   latestSnapshot = null;
+  currentFileManager = createCloudFileManager(drawingId);
   appJotaiStore.set(saveStatusAtom, { status: "idle" });
 };
 
@@ -109,6 +122,7 @@ export const primeAutosaveBaseline = (
 export const clearAutosaveBaseline = () => {
   baseline = { drawingId: null, revision: null, serialized: null };
   latestSnapshot = null;
+  currentFileManager = null;
   appJotaiStore.set(saveStatusAtom, { status: "idle" });
 };
 
@@ -171,6 +185,19 @@ const performSave = async () => {
       // success (ENGINEERING_GUARDRAILS.md #8).
       void clearLocalDraft(drawingId);
       appJotaiStore.set(saveStatusAtom, { status: "saved", at: Date.now() });
+
+      // Scene save and file upload are separate states
+      // (ENGINEERING_GUARDRAILS.md #9) — the scene is already durably
+      // saved at this point (it references file IDs, not bytes), so a
+      // slow/failed image upload doesn't block or flip the "saved" status
+      // back. FileManager dedupes by version, so unchanged images are a
+      // fast no-op on every call.
+      if (currentFileManager) {
+        currentFileManager.saveFiles({ elements, files }).catch((e) => {
+          // eslint-disable-next-line no-console
+          console.error("[personal-cloud] file upload failed", e);
+        });
+      }
     }
   } catch (e: any) {
     const current = getCurrentDrawing();
