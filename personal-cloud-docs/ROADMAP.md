@@ -384,20 +384,57 @@ loadState
 saveState
 ```
 
-- [ ] IndexedDB에 `drawingId`별 scene 초안 저장
-- [ ] 문서 전환 중 autosave 일시 정지
-- [ ] `serializeAsJSON(..., "database")` 재사용
-- [ ] 직렬화 결과 hash 비교로 실제 변경만 저장
-- [ ] 1.5~2.5초 debounce
-- [ ] 한 문서당 단일 저장 요청만 실행하고 최신 변경을 후속 저장으로 합치기
-- [ ] `revision` 조건부 UPDATE 구현
-- [ ] 충돌 감지 시 원격 로드/복사본 저장/덮어쓰기 UI 제공
-- [ ] 저장 실패 시 로컬 초안 보존
-- [ ] blur, 문서 전환, 로그아웃에서 저장 flush
-- [ ] 저장 중/저장됨/실패/오프라인 상태 표시
-- [ ] 공동편집 중 Cloud autosave 비활성화
+- [x] IndexedDB에 `drawingId`별 scene 초안 저장 (`cloud/localDraftStore.ts`,
+  `idb-keyval` 재사용, 기존 anonymous local-first storage와 별도 DB)
+- [x] 문서 전환 중 autosave 일시 정지 (`cloud/autosave.ts`의 `Locker` 기반
+  `pauseAutosave`/`resumeAutosave`, 기존 `excalidraw-app/data/Locker.ts` 재사용)
+- [x] `serializeAsJSON(..., "database")` 재사용 (모든 scene 비교/저장 지점에서)
+- [x] 직렬화 결과 비교로 실제 변경만 저장 (hash 대신 직렬화된 JSON 문자열
+  자체를 비교 — 충돌 위험이 없고 어차피 전송할 문자열이라 계산 낭비도 없음)
+- [x] debounce (로컬 초안 300ms / Cloud 저장 2000ms — 가이드 범위 1.5~2.5초 안)
+- [x] 한 문서당 단일 저장 요청만 실행하고 최신 변경을 후속 저장으로 합치기
+  (`latestSnapshot` + `inFlight`/`retryQueued`)
+- [x] `revision` 조건부 UPDATE 구현 (`updateDrawingScene` — PostgREST
+  `.eq("id", id).eq("revision", expected)` chained filter, RPC 없이 원자적)
+- [x] 충돌 감지 시 원격 로드/복사본 저장/덮어쓰기 UI 제공 (D-007,
+  `CloudSaveStatus.tsx`)
+- [x] 저장 실패 시 로컬 초안 보존 (성공 응답을 받을 때만 `clearLocalDraft` 호출)
+- [x] blur, 문서 전환, 로그아웃에서 저장 flush (`flushAutosave()`를
+  기존 `visibilityChange`/`onUnload`/`beforeunload` 핸들러, `openCloudDrawing`/
+  `adoptCloudDrawing`, `signOut()`에 연결)
+- [x] 저장 중/저장됨/실패/오프라인 상태 표시 (`CloudSaveStatus.tsx` 좌하단 pill)
+- [x] 공동편집 중 Cloud autosave 비활성화 (`App.tsx`의 `onChange`에서
+  `!collabAPI?.isCollaborating()` 체크 — 기존 `LocalData.save` 게이팅과 동일 지점)
+
+추가로 구현한 것 (가이드에 명시되진 않았지만 guardrail #8을 실제로 완성하는 데
+필요했던 부분): 그림을 열 때 IndexedDB에 서버 버전과 다른 로컬 초안이 남아있으면
+"로컬 변경 사용 / 서버 버전 사용" 프롬프트를 띄운다 (`openDrawing.ts`의
+`checkForNewerLocalDraft`, `localDraftPromptAtom`) — 로컬 초안을 만들어만 두고
+저장 실패 후 아무도 다시 보여주지 않으면 사실상 유실과 같기 때문이다.
 
 완료 조건: 네트워크 오류나 충돌이 발생해도 마지막 로컬 변경을 잃지 않는다.
+
+### 2026-08-19 구현 및 자체 검증 기록
+
+- `yarn test:typecheck`, `yarn test:code`(eslint), `yarn test:app`
+  (121 files, 1858 tests, 베이스라인과 동일), `node personal-cloud-harness/check-guardrails.mjs`
+  전부 통과.
+- 로컬 dev 서버로 확인: 앱 정상 기동, console error 없음, 로그인 안 된 상태에서
+  기존 anonymous local-first 흐름(local storage 복구 등)과 메뉴가 그대로 동작.
+  로그인 버튼이 실제 Google 로그인 화면까지 정상 도달함을 재확인(리팩터링 후에도
+  깨지지 않음).
+- **아직 실사용 검증하지 못한 것** (실제 로그인 + 두 세션/탭 동시 편집이 필요해
+  사용자가 직접 확인해야 함):
+  - 그림을 열고 편집했을 때 실제로 몇 초 후 "저장 중… → 저장됨"으로 바뀌는지
+  - 새로고침 후에도 편집 내용이 유지되는지 (revision이 실제로 올라갔는지)
+  - 같은 그림을 두 탭/기기에서 열고 한쪽에서 저장한 뒤 다른 쪽에서 편집하면
+    "다른 곳에서 이 그림이 먼저 저장됐습니다" 충돌 UI가 뜨는지, 3가지 선택지가
+    각각 의도대로 동작하는지
+  - 오프라인 상태(개발자도구 Network 탭에서 Offline)로 편집 후 온라인 복귀 시
+    자동으로 저장되는지, 오프라인 중 상태 표시가 "오프라인"으로 뜨는지
+  - 그림 편집 중 새로고침하거나 다른 그림을 열었다가 돌아왔을 때 "로컬 변경
+    사용 / 서버 버전 사용" 프롬프트가 뜨는지 (일부러 저장 직전에 새로고침해서
+    재현 필요)
 
 ## Milestone 5: 이미지와 파일
 

@@ -7,7 +7,10 @@
  */
 import { atom, useAtomValue, appJotaiStore } from "../app-jotai";
 
+import { clearAutosaveBaseline, flushAutosave } from "./autosave";
+import { getCurrentDrawing, setCurrentDrawing } from "./currentDrawing";
 import { supabase, isCloudConfigured } from "./supabaseClient";
+import { setDrawingIdInUrl } from "./urlDrawingId";
 
 import type { Session } from "@supabase/supabase-js";
 
@@ -51,6 +54,16 @@ if (supabase) {
       status: session ? "signed-in" : "signed-out",
       session,
     });
+
+    // signed out while a Cloud drawing was open: nothing more can be saved
+    // (RLS would reject it anyway once the JWT is gone), so drop back to
+    // anonymous local-first state cleanly instead of leaving stale
+    // drawing/save-status UI around.
+    if (!session && getCurrentDrawing().drawingId) {
+      clearAutosaveBaseline();
+      setCurrentDrawing(null);
+      setDrawingIdInUrl(null, { replace: true });
+    }
   });
 }
 
@@ -75,5 +88,8 @@ export const signOut = async () => {
   if (!supabase) {
     return;
   }
+  // best-effort: give any pending edit a chance to reach the server before
+  // the session (and the JWT that autosave needs) goes away.
+  flushAutosave();
   await supabase.auth.signOut();
 };

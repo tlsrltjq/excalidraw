@@ -1,5 +1,6 @@
 /**
- * Personal Excalidraw Cloud — drawings repository (Milestone 3).
+ * Personal Excalidraw Cloud — drawings repository (Milestone 3 CRUD,
+ * Milestone 4 adds `updateDrawingScene` for revision-checked autosave).
  *
  * Every function here throws if Cloud isn't configured or if Supabase
  * returns an error — callers (Dashboard UI) are expected to catch and show
@@ -143,4 +144,41 @@ export const getDrawing = async (id: string): Promise<CloudDrawing | null> => {
   }
 
   return toCloudDrawing(data);
+};
+
+export type UpdateSceneResult =
+  | { status: "ok"; revision: number; updatedAt: string }
+  | { status: "conflict" };
+
+/**
+ * Conditionally updates `scene_data`, atomically bumping `revision`, only
+ * if the row's current revision still matches `expectedRevision`
+ * (ENGINEERING_GUARDRAILS.md #7 — `UPDATE ... WHERE id = ? AND revision = ?`,
+ * expressed here as chained PostgREST filters rather than a separate RPC).
+ * If another writer already advanced the revision (or the row was
+ * deleted), zero rows match and this returns `{ status: "conflict" }`
+ * instead of silently overwriting (DECISIONS.md D-007).
+ */
+export const updateDrawingScene = async (
+  id: string,
+  sceneData: CloudSceneData,
+  expectedRevision: number,
+): Promise<UpdateSceneResult> => {
+  const client = requireClient();
+  const { data, error } = await client
+    .from(TABLE)
+    .update({ scene_data: sceneData, revision: expectedRevision + 1 })
+    .eq("id", id)
+    .eq("revision", expectedRevision)
+    .select("revision, updated_at")
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  if (!data) {
+    return { status: "conflict" };
+  }
+
+  return { status: "ok", revision: data.revision, updatedAt: data.updated_at };
 };

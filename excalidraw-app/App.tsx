@@ -102,6 +102,9 @@ import Collab, {
 import { AppFooter } from "./components/AppFooter";
 import { AppMainMenu } from "./components/AppMainMenu";
 import { Dashboard } from "./components/cloud/Dashboard";
+import { CloudSaveStatus } from "./components/cloud/CloudSaveStatus";
+import { flushAutosave, scheduleAutosave } from "./cloud/autosave";
+import { isCloudConfigured } from "./cloud/supabaseClient";
 import { AppWelcomeScreen } from "./components/AppWelcomeScreen";
 import {
   ExportToExcalidrawPlus,
@@ -656,11 +659,13 @@ const ExcalidrawWrapper = () => {
 
     const onUnload = () => {
       LocalData.flushSave();
+      flushAutosave();
     };
 
     const visibilityChange = (event: FocusEvent | Event) => {
       if (event.type === EVENT.BLUR || document.hidden) {
         LocalData.flushSave();
+        flushAutosave();
       }
       if (
         event.type === EVENT.VISIBILITY_CHANGE ||
@@ -691,6 +696,7 @@ const ExcalidrawWrapper = () => {
   useEffect(() => {
     const unloadHandler = (event: BeforeUnloadEvent) => {
       LocalData.flushSave();
+      flushAutosave();
 
       if (
         excalidrawAPI &&
@@ -720,6 +726,14 @@ const ExcalidrawWrapper = () => {
   ) => {
     if (collabAPI?.isCollaborating()) {
       collabAPI.syncElements(elements);
+    }
+
+    // Personal Cloud autosave: no-ops unless Cloud is configured and a
+    // Cloud drawing is currently open (D-004 anonymous local-first stays
+    // untouched); also skipped while collaborating (D-008), same call site
+    // as the existing collab check above.
+    if (isCloudConfigured && !collabAPI?.isCollaborating()) {
+      scheduleAutosave(elements, appState, files);
     }
 
     // this check is redundant, but since this is a hot path, it's best
@@ -1085,6 +1099,7 @@ const ExcalidrawWrapper = () => {
         )}
 
         <Dashboard excalidrawAPI={excalidrawAPI} />
+        <CloudSaveStatus excalidrawAPI={excalidrawAPI} />
 
         <ShareDialog
           collabAPI={collabAPI}

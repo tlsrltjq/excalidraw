@@ -1,10 +1,12 @@
 /**
- * Personal Excalidraw Cloud — Dashboard (Milestone 3).
+ * Personal Excalidraw Cloud — Dashboard (Milestone 3 CRUD/UI, wired to
+ * Milestone 4 autosave via `openCloudDrawing`/`adoptCloudDrawing`).
  *
  * Lists the signed-in user's drawings and lets them create / open / rename
- * / delete. Cloud autosave doesn't exist yet (Milestone 4) — opening a
- * drawing loads it into the editor via restoreElements/restoreAppState, but
- * further edits aren't written back until autosave lands.
+ * / delete. Opening or creating a drawing makes it the "current" Cloud
+ * drawing, so further edits autosave automatically (see cloud/autosave.ts)
+ * — the "현재 캔버스를 새 그림으로 저장" button is a manual seed/copy action,
+ * not a substitute for that.
  */
 import { Dialog } from "@excalidraw/excalidraw/components/Dialog";
 import { FilledButton } from "@excalidraw/excalidraw/components/FilledButton";
@@ -15,12 +17,7 @@ import {
   exportToFileIcon,
   pencilIcon,
 } from "@excalidraw/excalidraw/components/icons";
-import {
-  restoreAppState,
-  restoreElements,
-} from "@excalidraw/excalidraw/data/restore";
 import { serializeAsJSON } from "@excalidraw/excalidraw/data/json";
-import { CaptureUpdateAction } from "@excalidraw/excalidraw";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
@@ -35,34 +32,17 @@ import {
   listDrawings,
   renameDrawing,
 } from "../../cloud/drawings";
-import {
-  getDrawingIdFromUrl,
-  setDrawingIdInUrl,
-} from "../../cloud/urlDrawingId";
+import { adoptCloudDrawing, openCloudDrawing } from "../../cloud/openDrawing";
+import { getDrawingIdFromUrl } from "../../cloud/urlDrawingId";
 
 import "./Dashboard.scss";
 
-import type { CloudDrawing, CloudDrawingSummary } from "../../cloud/types";
+import type { CloudDrawingSummary } from "../../cloud/types";
 
 export const dashboardOpenAtom = atom(false);
 
 type Props = {
   excalidrawAPI: ExcalidrawImperativeAPI | null;
-};
-
-const applyDrawingToEditor = (
-  excalidrawAPI: ExcalidrawImperativeAPI,
-  drawing: CloudDrawing,
-) => {
-  excalidrawAPI.updateScene({
-    elements: restoreElements(drawing.sceneData.elements, null, {
-      repairBindings: true,
-      deleteInvisibleElements: true,
-    }),
-    appState: restoreAppState(drawing.sceneData.appState, null),
-    captureUpdate: CaptureUpdateAction.IMMEDIATELY,
-  });
-  setDrawingIdInUrl(drawing.id);
 };
 
 const formatUpdatedAt = (iso: string) => {
@@ -103,7 +83,7 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
       try {
         const drawing = await getDrawing(id);
         if (drawing) {
-          applyDrawingToEditor(excalidrawAPI, drawing);
+          openCloudDrawing(excalidrawAPI, drawing);
         }
       } catch (e) {
         // eslint-disable-next-line no-console
@@ -145,7 +125,7 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
     setError(null);
     try {
       const drawing = await createDrawing();
-      applyDrawingToEditor(excalidrawAPI, drawing);
+      openCloudDrawing(excalidrawAPI, drawing);
       setIsOpen(false);
     } catch (e: any) {
       setError(e?.message ?? String(e));
@@ -172,7 +152,9 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
         serializeAsJSON(elements, appState, files, "database"),
       );
       const drawing = await createDrawing(title || "제목 없는 그림", sceneData);
-      setDrawingIdInUrl(drawing.id);
+      // content is already on screen — just adopt it as the current
+      // drawing so further edits autosave into it, no scene reload needed.
+      adoptCloudDrawing(drawing, elements, appState, files);
       await refresh();
     } catch (e: any) {
       setError(e?.message ?? String(e));
@@ -194,7 +176,7 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
         await refresh();
         return;
       }
-      applyDrawingToEditor(excalidrawAPI, drawing);
+      openCloudDrawing(excalidrawAPI, drawing);
       setIsOpen(false);
     } catch (e: any) {
       setError(e?.message ?? String(e));
