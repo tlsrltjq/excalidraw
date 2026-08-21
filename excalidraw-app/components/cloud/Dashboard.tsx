@@ -1,6 +1,7 @@
 /**
  * Personal Excalidraw Cloud — Dashboard (Milestone 3 CRUD/UI, wired to
- * Milestone 4 autosave via `openCloudDrawing`/`adoptCloudDrawing`).
+ * Milestone 4 autosave via `openCloudDrawing`/`adoptCloudDrawing`, and to
+ * Milestone 6's `VersionHistory` dialog via the history icon per row).
  *
  * Lists the signed-in user's drawings and lets them create / open / rename
  * / delete. Opening or creating a drawing makes it the "current" Cloud
@@ -15,6 +16,7 @@ import {
   PlusIcon,
   TrashIcon,
   exportToFileIcon,
+  historyIcon,
   pencilIcon,
 } from "@excalidraw/excalidraw/components/icons";
 import { serializeAsJSON } from "@excalidraw/excalidraw/data/json";
@@ -24,7 +26,7 @@ import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 import { useCloudSession } from "../../cloud/session";
 
-import { atom, useAtom } from "../../app-jotai";
+import { atom, useAtom, useSetAtom } from "../../app-jotai";
 import {
   createDrawing,
   deleteDrawing,
@@ -36,6 +38,8 @@ import { adoptCloudDrawing, openCloudDrawing } from "../../cloud/openDrawing";
 import { getDrawingIdFromUrl } from "../../cloud/urlDrawingId";
 
 import "./Dashboard.scss";
+
+import { versionHistoryTargetAtom } from "./VersionHistory";
 
 import type { CloudDrawingSummary } from "../../cloud/types";
 
@@ -65,6 +69,7 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
 
   const { status } = useCloudSession();
   const autoOpenedRef = useRef(false);
+  const setVersionHistoryTarget = useSetAtom(versionHistoryTargetAtom);
 
   // Makes the `?drawing=<uuid>` URL (D-006) meaningful: reloading or
   // sharing the URL reopens the same drawing. Runs once, silently (doesn't
@@ -299,6 +304,20 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
                   disabled={busyId === drawing.id}
                 >
                   {pencilIcon}
+                </button>
+                <button
+                  type="button"
+                  aria-label="버전 기록"
+                  className="personal-cloud-dashboard__iconButton"
+                  onClick={() =>
+                    setVersionHistoryTarget({
+                      drawingId: drawing.id,
+                      title: drawing.title,
+                    })
+                  }
+                  disabled={busyId === drawing.id}
+                >
+                  {historyIcon}
                 </button>
                 <button
                   type="button"

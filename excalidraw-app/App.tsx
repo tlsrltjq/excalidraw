@@ -102,6 +102,7 @@ import Collab, {
 import { AppFooter } from "./components/AppFooter";
 import { AppMainMenu } from "./components/AppMainMenu";
 import { Dashboard } from "./components/cloud/Dashboard";
+import { VersionHistory } from "./components/cloud/VersionHistory";
 import { CloudSaveStatus } from "./components/cloud/CloudSaveStatus";
 import {
   flushAutosave,
@@ -1106,6 +1107,7 @@ const ExcalidrawWrapper = () => {
         )}
 
         <Dashboard excalidrawAPI={excalidrawAPI} />
+        <VersionHistory excalidrawAPI={excalidrawAPI} />
         <CloudSaveStatus excalidrawAPI={excalidrawAPI} />
 
         <ShareDialog
