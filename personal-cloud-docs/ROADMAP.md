@@ -513,14 +513,50 @@ migration 적용 후 실제 배포 주소에서 확인:
 ## Milestone 6: MVP 검증과 복구
 
 - [ ] Windows에서 생성 후 Mac/iPad에서 복원
-- [ ] 같은 그림의 동시 편집 충돌 테스트
-- [ ] 오프라인 편집 후 재연결 테스트
+- [x] 같은 그림의 동시 편집 충돌 테스트 (사용자 확인, 2026-08-21 — 탭 2개로
+  재현, 충돌 UI와 버튼 3개 동작 확인)
+- [x] 오프라인 편집 후 재연결 테스트 (사용자 확인, 2026-08-21)
 - [ ] 다른 계정 접근 차단 테스트
 - [ ] 새로고침/탭 종료/로그아웃 중 데이터 보존 테스트
 - [ ] 전체 drawing Export Backup
-- [ ] 최소 version history 구현
+- [x] 최소 version history 구현 (D-012 — 코드 완료, 아래 기록. migration 적용
+  + 실제 복원 테스트는 사용자가 직접)
 
 완료 조건: 로그인부터 여러 기기 복원까지 MVP 사용자 흐름이 안정적이다.
+
+### 2026-08-21 최소 Version History 구현 기록
+
+D-012 결정에 따라 구현했다 (구글 시트/문서 버전 기록을 단순화한 모델 —
+설계 논의는 대화 기록 참고).
+
+- `supabase/migrations/20260821125802_create_drawing_revisions.sql`:
+  `drawing_revisions` table (읽기 전용 — `authenticated`에 SELECT만 GRANT,
+  INSERT/UPDATE/DELETE 권한 없음), `drawings`의 `BEFORE UPDATE` trigger가
+  `scene_data`가 실제로 바뀔 때마다 "덮어써지기 직전 상태"를 자동으로 남기고
+  그림당 최근 50개만 남기고 정리한다. 트리거 함수는 `security definer` +
+  `search_path` 고정(권장 hardening)으로 작성해 `authenticated`가 직접 못
+  쓰는 테이블에 안전하게 쓴다.
+- `excalidraw-app/cloud/revisions.ts`: `listRevisions`(목록, scene_data
+  제외 — 가볍게), `restoreRevision`(과거 scene_data를 현재 drawing에
+  일반적인 조건부 UPDATE로 다시 씀 — autosave/충돌 해결과 동일한 낙관적
+  동시성 검사를 그대로 통과해야 하고, 복원 자체도 트리거가 다시 기록해서
+  "복원을 되돌리기"도 가능).
+- `excalidraw-app/components/cloud/VersionHistory.tsx`: Dashboard 각 행의
+  히스토리 아이콘에서 여는 다이얼로그. 시점 목록 + "복원" 버튼(확인 dialog
+  거침). 미리보기는 이번 범위에 넣지 않았다. 복원 대상 그림이 지금 에디터에
+  열려 있으면 자동으로 다시 불러와 화면을 최신 상태로 맞춘다.
+- **검증**: `yarn test:typecheck`, `yarn test:code`(eslint), `yarn test:app`
+  (121 files, 1858 tests, 베이스라인과 동일), `check-guardrails.mjs` 전부
+  통과. 로컬 dev 서버 정상 기동, console error 없음.
+
+**남은 것 (사용자가 직접)**:
+
+1. Supabase SQL Editor에서
+   `supabase/migrations/20260821125802_create_drawing_revisions.sql` 실행.
+2. 그림 편집 → 저장 몇 번 반복 → "내 그림"에서 히스토리 아이콘 클릭 →
+   목록에 시점들이 쌓이는지 확인.
+3. 아무 시점이나 "복원" 클릭 → 캔버스가 그 시점 내용으로 바뀌는지, 다시
+   히스토리를 열면 방금 복원 전 상태도 새 항목으로 남아있는지 확인.
 
 ## Milestone 7: 자체 공동편집 서버
 
