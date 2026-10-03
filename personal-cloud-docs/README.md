@@ -9,6 +9,8 @@
 - [ARCHITECTURE.md](./ARCHITECTURE.md): 개발 흐름, MVP 및 최종 아키텍처
 - [DECISIONS.md](./DECISIONS.md): 주요 설계 결정과 미결정 사항
 - [ENGINEERING_GUARDRAILS.md](./ENGINEERING_GUARDRAILS.md): 소스 코드와 로직 구현 규칙
+- [VALIDATION.md](./VALIDATION.md): MVP 수동/자동 검증 결과와 미해결 항목
+- [operations.md](./operations.md): 운영 DB 접근 정책 조회와 테스트 데이터 정리
 
 ## 문서 관리 원칙
 
@@ -30,6 +32,7 @@ personal-cloud-docs/
 ├── ARCHITECTURE.md
 ├── DECISIONS.md
 ├── ENGINEERING_GUARDRAILS.md
+├── VALIDATION.md
 ├── cloud-storage.md       # Cloud Save 구현 시
 ├── collaboration.md      # 협업 서버 독립화 시
 ├── ai-gateway.md          # AI Gateway 구현 시

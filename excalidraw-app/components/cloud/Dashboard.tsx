@@ -24,9 +24,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
-import { useCloudSession } from "../../cloud/session";
+import { cloudSessionAtom, useCloudSession } from "../../cloud/session";
 
-import { atom, useAtom, useSetAtom } from "../../app-jotai";
+import { atom, appJotaiStore, useAtom, useSetAtom } from "../../app-jotai";
+import { clearAutosaveBaseline } from "../../cloud/autosave";
 import {
   createDrawing,
   deleteDrawing,
@@ -35,7 +36,12 @@ import {
   renameDrawing,
 } from "../../cloud/drawings";
 import { adoptCloudDrawing, openCloudDrawing } from "../../cloud/openDrawing";
+import {
+  getCurrentDrawing,
+  setCurrentDrawing,
+} from "../../cloud/currentDrawing";
 import { getDrawingIdFromUrl } from "../../cloud/urlDrawingId";
+import { loadCloudDrawingFromUrl } from "../../cloud/urlDrawingLoader";
 
 import "./Dashboard.scss";
 
@@ -61,14 +67,19 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
   const [isOpen, setIsOpen] = useAtom(dashboardOpenAtom);
   const [drawings, setDrawings] = useState<CloudDrawingSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [urlLoadError, setUrlLoadError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
-  const { status } = useCloudSession();
-  const autoOpenedRef = useRef(false);
+  const { status, session } = useCloudSession();
+  const autoOpenedKeyRef = useRef<string | null>(null);
+  const autoOpenPromiseRef = useRef<{
+    key: string;
+    promise: ReturnType<typeof getDrawing>;
+  } | null>(null);
   const setVersionHistoryTarget = useSetAtom(versionHistoryTargetAtom);
 
   // Makes the `?drawing=<uuid>` URL (D-006) meaningful: reloading or
@@ -76,29 +87,66 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
   // open this dialog), as soon as we know the user is signed in and the
   // editor is ready.
   useEffect(() => {
-    if (autoOpenedRef.current || !excalidrawAPI || status !== "signed-in") {
+    if (!excalidrawAPI || status !== "signed-in") {
       return;
     }
     const id = getDrawingIdFromUrl();
-    if (!id) {
+    const userId = session?.user.id;
+    if (!id || !userId) {
       return;
     }
-    autoOpenedRef.current = true;
-    (async () => {
-      try {
-        const drawing = await getDrawing(id);
-        if (drawing) {
-          openCloudDrawing(excalidrawAPI, drawing);
-        }
-      } catch (e) {
-        // eslint-disable-next-line no-console
-        console.error(
-          "[personal-cloud] failed to auto-open drawing from URL",
-          e,
-        );
+    const requestKey = `${userId}:${id}`;
+    if (autoOpenedKeyRef.current === requestKey) {
+      return;
+    }
+    if (autoOpenPromiseRef.current?.key !== requestKey) {
+      autoOpenPromiseRef.current = {
+        key: requestKey,
+        promise: getDrawing(id),
+      };
+    }
+    const drawingPromise = autoOpenPromiseRef.current.promise;
+    const generation = getCurrentDrawing().generation;
+
+    let cancelled = false;
+    const isCurrent = () =>
+      !cancelled &&
+      getDrawingIdFromUrl() === id &&
+      getCurrentDrawing().generation === generation &&
+      appJotaiStore.get(cloudSessionAtom).session?.user.id === userId;
+
+    void loadCloudDrawingFromUrl({
+      drawingId: id,
+      getDrawing: () => drawingPromise,
+      isCurrent,
+      openDrawing: (drawing) => openCloudDrawing(excalidrawAPI, drawing),
+    }).then((result) => {
+      if (autoOpenPromiseRef.current?.promise === drawingPromise) {
+        autoOpenPromiseRef.current = null;
       }
-    })();
-  }, [excalidrawAPI, status]);
+      if (result.status === "stale") {
+        return;
+      }
+      autoOpenedKeyRef.current = requestKey;
+      if (result.status === "opened") {
+        setUrlLoadError(null);
+        return;
+      }
+
+      clearAutosaveBaseline();
+      setCurrentDrawing(null);
+      setUrlLoadError(
+        result.status === "not-found"
+          ? "이 Cloud 그림을 찾을 수 없거나 접근 권한이 없습니다. 현재 캔버스는 그대로 유지되지만 요청한 그림에서 불러온 내용은 아닙니다. 다른 그림 또는 이 브라우저의 로컬 데이터일 수 있으며, Cloud 자동 저장 연결은 해제했습니다."
+          : "Cloud 그림을 불러오지 못했습니다. 네트워크와 접근 권한을 확인해 주세요. 현재 캔버스는 그대로 유지되지만 요청한 그림에서 불러온 내용은 아닙니다. Cloud 자동 저장 연결은 해제했습니다.",
+      );
+      setIsOpen(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [excalidrawAPI, session?.user.id, setIsOpen, status]);
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -128,6 +176,7 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
     }
     setCreating(true);
     setError(null);
+    setUrlLoadError(null);
     try {
       const drawing = await createDrawing();
       openCloudDrawing(excalidrawAPI, drawing);
@@ -149,6 +198,7 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
     }
     setSaving(true);
     setError(null);
+    setUrlLoadError(null);
     try {
       const elements = excalidrawAPI.getSceneElements();
       const appState = excalidrawAPI.getAppState();
@@ -174,6 +224,7 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
     }
     setBusyId(id);
     setError(null);
+    setUrlLoadError(null);
     try {
       const drawing = await getDrawing(id);
       if (!drawing) {
@@ -254,6 +305,12 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
           </div>
         )}
 
+        {urlLoadError && (
+          <div className="personal-cloud-dashboard__error" role="alert">
+            {urlLoadError}
+          </div>
+        )}
+
         {drawings === null && !error && (
           <div className="personal-cloud-dashboard__empty">불러오는 중…</div>
         )}
@@ -309,12 +366,13 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
                   type="button"
                   aria-label="버전 기록"
                   className="personal-cloud-dashboard__iconButton"
-                  onClick={() =>
+                  onClick={() => {
+                    setIsOpen(false);
                     setVersionHistoryTarget({
                       drawingId: drawing.id,
                       title: drawing.title,
-                    })
-                  }
+                    });
+                  }}
                   disabled={busyId === drawing.id}
                 >
                   {historyIcon}
