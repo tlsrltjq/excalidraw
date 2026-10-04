@@ -197,3 +197,28 @@
   상태"도 자동으로 히스토리에 남는다 — 즉 복원조차 되돌릴 수 있다. 미리보기
   UI는 이번 범위에 넣지 않는다(목록에서 바로 복원, 확인 dialog로 실수 방지).
 - 결정일: 2026-08-21 (사용자가 보관 개수 50으로 결정한 시점)
+
+## D-013: 이미지까지 완료된 저장 상태
+
+- 상태: 결정 (2026-10-03)
+- 완료 조건: scene 저장과 이미지 업로드가 모두 성공해야 `saved`로 표시한다. 업로드 중과 부분 실패를 표시하고, 그림을 수정하지 않아도 실패한 파일을 재시도할 수 있다.
+- 구현: 기존 문서별 FileManager를 사용하며 업로드까지 single-flight 범위에 포함한다. scene revision 성공은 별도로 반영하므로 파일 재시도 때문에 scene을 다시 UPDATE하지 않는다.
+- 위험과 검증: 문서 전환/동일 문서 재열기 generation, 느린 업로드 중 후속 변경, 반환된 erroredFiles, Promise 거절, offline, revision 충돌을 검사한다. 실패하거나 더 최신 변경이 있으면 로컬 초안을 삭제하지 않는다.
+- 범위 제외: 초안 저장소는 scene/app state만 보관한다. 이미지 binary의 문서별 offline 복구 보장은 별도 작업이며 이번 수정만으로 새로고침 후 미업로드 이미지 복구를 보장하지 않는다. DB migration과 upstream core 변경은 없다.
+
+## D-014: 이미지가 포함된 문서별 로컬 초안
+
+- 상태: 결정 (2026-10-04), Milestone 6
+- 완료 조건: 초안의 element/app state와 참조 BinaryFiles를 하나의 IndexedDB 레코드로 저장한다. 업로드 실패 뒤 재열기에서 이미지까지 복원하고 다시 업로드할 수 있어야 한다. scene이 원격과 같아도 원격에 없는 이미지 bytes가 있으면 복구를 제안한다.
+- 호환성: 기존 `files` 없는 초안을 읽을 수 있도록 optional 필드를 추가한다. 서버 DB migration이나 dependency 추가는 하지 않는다. 다른 문서의 파일을 가져오지 않으며 로컬 데이터는 해당 브라우저 origin에만 남는다.
+- 비동기 규칙: 초안 조회/이미지 다운로드/복원 뒤 drawingId와 generation을 검사한다. 복구 선택까지 autosave를 잠그고, 실패한 로컬 저장은 UI에 알린다. 성공 후 초안 삭제는 해당 snapshot token과 일치할 때만 같은 transaction에서 실행한다.
+- 검증: 실제 IndexedDB 테스트로 bytes 보존/구버전 호환/문서 분리/조건부 삭제를 검사한다. 업로드 실패 후 같은 scene 복구, 재시도, stale 응답, quota 실패, 종료 전 flush를 자동 테스트한다.
+- 한계: 브라우저 강제 종료 전에 끝나지 않은 transaction, 저장소 삭제/eviction, 다른 origin/기기 복구는 보장하지 않는다. 파일을 매 이벤트 복사하지 않고 debounce worker에서 필요한 파일만 보관한다. 전체 drawing backup/export는 다음 작업이다.
+
+## D-015: 현재 그림의 이미지 포함 백업 검증
+
+- 상태: 자동 및 Safari 다운로드/복원/새 Cloud 그림 저장 검증 완료 (2026-10-04), Milestone 6
+- 범위: 현재 캔버스의 전체 `.excalidraw` 파일 및 PNG/SVG export를 기존 upstream serializer/export/import API로 검증한다. 새 백업 schema나 dependency는 만들지 않는다.
+- 완료 조건: Cloud의 database scene과 별도 이미지 bytes를 합친 캔버스를 파일로 저장하고, 빈 편집 상태에서 이미지/element/app state를 복원할 수 있다. SVG에는 이미지 bytes가 포함되고, 편집 데이터 포함 PNG/SVG도 복원 가능해야 한다. 관련 자동 테스트와 Safari 수동 결과를 구분해 기록한다.
+- 위험: database JSON에는 이미지 bytes가 없으므로 단독 백업으로 취급하지 않는다. 선택 영역 export는 전체 백업이 아니며, 파일 다운로드 전 미복원 이미지는 확인해야 한다. 일반 PNG/SVG는 편집 데이터를 포함하지 않으면 scene 복구본이 아니다.
+- 범위 제외: 계정 전체 그림 일괄 export/import, 버전 기록/권한/Cloud ID 보존은 별도 기능이다. 원본 Cloud 그림을 덮어쓰지 않는 새 그림 복원 절차를 운영 문서에 기록한다.

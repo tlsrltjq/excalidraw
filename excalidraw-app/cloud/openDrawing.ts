@@ -24,9 +24,10 @@ import {
   flushAutosave,
   getCurrentFileManager,
   localDraftPromptAtom,
-  pauseAutosave,
+  localDraftErrorAtom,
+  pauseDrawingLoad,
   primeAutosaveBaseline,
-  resumeAutosave,
+  scheduleAutosave,
 } from "./autosave";
 import { getCurrentDrawing, setCurrentDrawing } from "./currentDrawing";
 import { getLocalDraft } from "./localDraftStore";
@@ -47,7 +48,6 @@ export const openCloudDrawing = (
   // guardrail #6/#8: never switch away from whatever was previously open
   // without giving its last pending edit a chance to reach the server.
   flushAutosave();
-  pauseAutosave();
 
   const restoredElements = restoreElements(drawing.sceneData.elements, null, {
     repairBindings: true,
@@ -55,30 +55,36 @@ export const openCloudDrawing = (
   });
   const restoredAppState = restoreAppState(drawing.sceneData.appState, null);
 
-  setCurrentDrawing(drawing.id);
-  excalidrawAPI.updateScene({
-    elements: restoredElements,
-    appState: restoredAppState,
-    captureUpdate: CaptureUpdateAction.IMMEDIATELY,
-  });
-  setDrawingIdInUrl(drawing.id);
-  primeAutosaveBaseline(
-    drawing.id,
-    drawing.revision,
-    restoredElements,
-    restoredAppState,
-    {},
-  );
+  const generation = setCurrentDrawing(drawing.id);
+  const releaseLoad = pauseDrawingLoad(generation);
+  try {
+    appJotaiStore.set(localDraftPromptAtom, null);
+    excalidrawAPI.updateScene({
+      elements: restoredElements,
+      appState: restoredAppState,
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+    });
+    setDrawingIdInUrl(drawing.id);
+    primeAutosaveBaseline(
+      drawing.id,
+      drawing.revision,
+      restoredElements,
+      restoredAppState,
+      {},
+    );
 
-  // Release the lock on the next tick — by then, the `onChange` this
-  // `updateScene` call may trigger will already have run. If it slips
-  // through anyway, `performSave`'s baseline-equality check is the real
-  // safety net (see autosave.ts), so this is defense-in-depth, not the
-  // only guard.
-  setTimeout(resumeAutosave, 0);
-
-  void checkForNewerLocalDraft(drawing.id, restoredElements, restoredAppState);
-  void loadDrawingImages(excalidrawAPI, drawing.id, restoredElements);
+    return initializeDrawingRecovery(
+      excalidrawAPI,
+      drawing.id,
+      generation,
+      restoredElements,
+      restoredAppState,
+      releaseLoad,
+    );
+  } catch (error) {
+    releaseLoad();
+    throw error;
+  }
 };
 
 /**
@@ -88,10 +94,13 @@ export const openCloudDrawing = (
  * with their "pending" placeholder until this resolves, same as the
  * existing local-first image loading path.
  */
-const loadDrawingImages = async (
+const initializeDrawingRecovery = async (
   excalidrawAPI: ExcalidrawImperativeAPI,
   drawingId: string,
+  generation: number,
   elements: readonly ExcalidrawElement[],
+  appState: CloudAppState,
+  releaseLoad: () => unknown,
 ) => {
   const fileIds = elements.reduce<FileId[]>((acc, element) => {
     if (isInitializedImageElement(element)) {
@@ -100,20 +109,86 @@ const loadDrawingImages = async (
     return acc;
   }, []);
 
-  if (!fileIds.length) {
-    return;
-  }
-
   const fileManager = getCurrentFileManager();
-  // the user may have already switched drawings by the time this resolves
-  // (guardrail #5) — bail rather than add stale images to whatever's open now.
-  if (!fileManager || getCurrentDrawing().drawingId !== drawingId) {
-    return;
-  }
-
-  const { loadedFiles } = await fileManager.getFiles(fileIds);
-  if (loadedFiles.length && getCurrentDrawing().drawingId === drawingId) {
-    excalidrawAPI.addFiles(loadedFiles);
+  const isCurrent = () => {
+    const current = getCurrentDrawing();
+    return current.drawingId === drawingId && current.generation === generation;
+  };
+  let initialized = false;
+  try {
+    const draft = await getLocalDraft(drawingId);
+    if (!isCurrent()) {
+      return;
+    }
+    const { loadedFiles } =
+      fileIds.length && fileManager
+        ? await fileManager.getFiles(fileIds)
+        : { loadedFiles: [] };
+    if (!isCurrent()) {
+      return;
+    }
+    if (loadedFiles.length) {
+      excalidrawAPI.addFiles(loadedFiles);
+    }
+    if (draft) {
+      const draftElements = restoreElements(draft.elements, null, {
+        repairBindings: true,
+        deleteInvisibleElements: true,
+      });
+      const draftAppState = restoreAppState(draft.appState, null);
+      const serverSerialized = serializeAsJSON(
+        elements,
+        appState,
+        {},
+        "database",
+      );
+      const draftSerialized = serializeAsJSON(
+        draftElements,
+        draftAppState,
+        {},
+        "database",
+      );
+      const localFiles = draft.files ?? {};
+      const unsyncedImage = draftElements.some((element) => {
+        if (
+          !isInitializedImageElement(element) ||
+          !localFiles[element.fileId]
+        ) {
+          return false;
+        }
+        const remote = loadedFiles.find((file) => file.id === element.fileId);
+        return !remote || remote.dataURL !== localFiles[element.fileId].dataURL;
+      });
+      if (draftSerialized !== serverSerialized || unsyncedImage) {
+        appJotaiStore.set(localDraftPromptAtom, {
+          drawingId,
+          elements: draftElements,
+          appState: draftAppState,
+          files: localFiles,
+        });
+      }
+    }
+    initialized = true;
+  } catch {
+    if (isCurrent()) {
+      appJotaiStore.set(
+        localDraftErrorAtom,
+        "로컬 초안 또는 이미지를 읽지 못했습니다. 파일 백업을 확인하세요.",
+      );
+    }
+  } finally {
+    releaseLoad();
+    if (
+      initialized &&
+      isCurrent() &&
+      !appJotaiStore.get(localDraftPromptAtom)
+    ) {
+      scheduleAutosave(
+        excalidrawAPI.getSceneElements(),
+        excalidrawAPI.getAppState(),
+        excalidrawAPI.getFiles(),
+      );
+    }
   }
 };
 
@@ -140,42 +215,6 @@ export const adoptCloudDrawing = (
     files,
   );
   setDrawingIdInUrl(drawing.id);
-};
-
-const checkForNewerLocalDraft = async (
-  drawingId: string,
-  serverElements: Parameters<typeof restoreElements>[0],
-  serverAppState: ReturnType<typeof restoreAppState>,
-) => {
-  const draft = await getLocalDraft(drawingId);
-  if (!draft) {
-    return;
-  }
-  // still looking at the same drawing?
-  if (appJotaiStore.get(localDraftPromptAtom)?.drawingId === drawingId) {
-    return;
-  }
-
-  const serverSerialized = serializeAsJSON(
-    serverElements ?? [],
-    serverAppState,
-    {},
-    "database",
-  );
-  const draftSerialized = serializeAsJSON(
-    draft.elements,
-    draft.appState,
-    {},
-    "database",
-  );
-
-  if (draftSerialized === serverSerialized) {
-    return;
-  }
-
-  appJotaiStore.set(localDraftPromptAtom, {
-    drawingId,
-    elements: draft.elements,
-    appState: draft.appState,
-  });
+  scheduleAutosave(elements, appState, files);
+  flushAutosave();
 };

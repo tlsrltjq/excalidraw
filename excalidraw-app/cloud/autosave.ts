@@ -14,8 +14,9 @@
  * whatever the latest snapshot is once the first one finishes (#5 "최신
  * 변경을 후속 저장으로 합치기").
  */
-import { debounce } from "@excalidraw/common";
+import { debounce, randomId } from "@excalidraw/common";
 import { serializeAsJSON } from "@excalidraw/excalidraw/data/json";
+import { isInitializedImageElement } from "@excalidraw/element";
 
 import type { ExcalidrawElement } from "@excalidraw/element/types";
 import type { BinaryFiles } from "@excalidraw/excalidraw/types";
@@ -36,17 +37,21 @@ import type { CloudAppState } from "./types";
 export type SaveStatus =
   | { status: "idle" }
   | { status: "saving" }
+  | { status: "uploading" }
+  | { status: "file-error"; message: string }
   | { status: "saved"; at: number }
   | { status: "offline" }
   | { status: "error"; message: string }
   | { status: "conflict" };
 
 export const saveStatusAtom = atom<SaveStatus>({ status: "idle" });
+export const localDraftErrorAtom = atom<string | null>(null);
 
 export type LocalDraftPrompt = {
   drawingId: string;
   elements: readonly ExcalidrawElement[];
   appState: CloudAppState;
+  files?: BinaryFiles;
 };
 
 /**
@@ -62,6 +67,9 @@ type Snapshot = {
   elements: readonly ExcalidrawElement[];
   appState: CloudAppState;
   files: BinaryFiles;
+  token: string;
+  draftPending: boolean;
+  draftWrite?: Promise<void>;
 };
 
 /**
@@ -90,12 +98,27 @@ export const getCurrentFileManager = () => currentFileManager;
 
 type LockReason = "loading";
 const locker = new Locker<LockReason>();
+let loadingLocks = 0;
+const drawingLoads = new Set<number>();
 
 /** Held while a remote scene is being restored into the editor so the
  * resulting `onChange` doesn't get treated as a user edit. */
-export const pauseAutosave = () => locker.lock("loading");
-export const resumeAutosave = () => locker.unlock("loading");
-export const isAutosavePaused = () => locker.isLocked();
+export const pauseAutosave = () => {
+  loadingLocks += 1;
+  locker.lock("loading");
+};
+export const resumeAutosave = () => {
+  loadingLocks = Math.max(0, loadingLocks - 1);
+  if (!loadingLocks) {
+    locker.unlock("loading");
+  }
+};
+export const pauseDrawingLoad = (generation: number) => {
+  drawingLoads.add(generation);
+  return () => drawingLoads.delete(generation);
+};
+export const isAutosavePaused = () =>
+  locker.isLocked() || drawingLoads.has(getCurrentDrawing().generation);
 
 /**
  * Call right after a drawing is loaded, created, or saved, to establish
@@ -116,6 +139,7 @@ export const primeAutosaveBaseline = (
   latestSnapshot = null;
   currentFileManager = createCloudFileManager(drawingId);
   appJotaiStore.set(saveStatusAtom, { status: "idle" });
+  appJotaiStore.set(localDraftErrorAtom, null);
 };
 
 /** Call when leaving Cloud editing entirely (back to Dashboard, logout). */
@@ -124,12 +148,45 @@ export const clearAutosaveBaseline = () => {
   latestSnapshot = null;
   currentFileManager = null;
   appJotaiStore.set(saveStatusAtom, { status: "idle" });
+  appJotaiStore.set(localDraftErrorAtom, null);
+};
+
+export const shouldPreventCloudUnload = () =>
+  !!getCurrentDrawing().drawingId &&
+  (isAutosavePaused() ||
+    inFlight ||
+    !!latestSnapshot?.draftPending ||
+    !!appJotaiStore.get(localDraftErrorAtom));
+
+const reportDraftError = (drawingId: string, generation: number) => {
+  const current = getCurrentDrawing();
+  if (current.drawingId === drawingId && current.generation === generation) {
+    appJotaiStore.set(
+      localDraftErrorAtom,
+      "로컬 복구 저장에 실패했습니다. 저장 공간을 확인하고 파일로 내보내세요.",
+    );
+  }
+};
+
+const clearSavedDraft = async (
+  drawingId: string,
+  generation: number,
+  snapshot: Snapshot,
+) => {
+  await snapshot.draftWrite;
+  try {
+    await clearLocalDraft(drawingId, snapshot.token);
+  } catch {
+    reportDraftError(drawingId, generation);
+  }
 };
 
 const performSave = async () => {
   const { drawingId } = getCurrentDrawing();
   if (
+    isAutosavePaused() ||
     !drawingId ||
+    appJotaiStore.get(localDraftPromptAtom)?.drawingId === drawingId ||
     drawingId !== baseline.drawingId ||
     baseline.revision === null ||
     !latestSnapshot
@@ -143,11 +200,27 @@ const performSave = async () => {
     return;
   }
 
-  const { elements, appState, files } = latestSnapshot;
+  const snapshot = latestSnapshot;
+  const { elements, appState, files } = snapshot;
   const serialized = serializeAsJSON(elements, appState, files, "database");
+  const fileManager = currentFileManager;
+  const activeElements = elements.filter((element) => !element.isDeleted);
+  const missingFiles = activeElements.some(
+    (element) => isInitializedImageElement(element) && !files[element.fileId],
+  );
+  const pendingFiles = activeElements.some(
+    (element) =>
+      isInitializedImageElement(element) &&
+      files[element.fileId] &&
+      !fileManager?.isFileSavedOrBeingSaved(files[element.fileId]),
+  );
 
-  if (serialized === baseline.serialized) {
-    // nothing actually changed since the last successful save.
+  if (serialized === baseline.serialized && !pendingFiles && !missingFiles) {
+    debouncedLocalDraftSave.flush();
+    void clearSavedDraft(drawingId, getCurrentDrawing().generation, snapshot);
+    if (appJotaiStore.get(saveStatusAtom).status === "saving") {
+      appJotaiStore.set(saveStatusAtom, { status: "saved", at: Date.now() });
+    }
     return;
   }
 
@@ -156,48 +229,72 @@ const performSave = async () => {
 
   const expectedRevision = baseline.revision;
   const generationAtStart = getCurrentDrawing().generation;
+  const isCurrent = () => {
+    const current = getCurrentDrawing();
+    return (
+      current.drawingId === drawingId &&
+      current.generation === generationAtStart
+    );
+  };
+  let uploading = false;
 
   try {
-    const result = await updateDrawingScene(
-      drawingId,
-      JSON.parse(serialized),
-      expectedRevision,
-    );
-
-    const current = getCurrentDrawing();
-    if (
-      current.drawingId !== drawingId ||
-      current.generation !== generationAtStart
-    ) {
-      // user switched drawings while this save was in flight — the result
-      // no longer applies to what's on screen.
+    debouncedLocalDraftSave.flush();
+    await snapshot.draftWrite;
+    if (!isCurrent()) {
       return;
     }
-
-    if (result.status === "conflict") {
-      // stop treating this as "saved" and let the UI offer resolution
-      // (DECISIONS.md D-007). Don't touch baseline — we don't know which
-      // side should win yet.
-      appJotaiStore.set(saveStatusAtom, { status: "conflict" });
-    } else {
-      baseline = { drawingId, revision: result.revision, serialized };
-      // only clear the offline/failure safety net after a *confirmed*
-      // success (ENGINEERING_GUARDRAILS.md #8).
-      void clearLocalDraft(drawingId);
-      appJotaiStore.set(saveStatusAtom, { status: "saved", at: Date.now() });
-
-      // Scene save and file upload are separate states
-      // (ENGINEERING_GUARDRAILS.md #9) — the scene is already durably
-      // saved at this point (it references file IDs, not bytes), so a
-      // slow/failed image upload doesn't block or flip the "saved" status
-      // back. FileManager dedupes by version, so unchanged images are a
-      // fast no-op on every call.
-      if (currentFileManager) {
-        currentFileManager.saveFiles({ elements, files }).catch((e) => {
-          // eslint-disable-next-line no-console
-          console.error("[personal-cloud] file upload failed", e);
-        });
+    if (serialized !== baseline.serialized) {
+      const result = await updateDrawingScene(
+        drawingId,
+        JSON.parse(serialized),
+        expectedRevision,
+      );
+      if (!isCurrent()) {
+        return;
       }
+      if (result.status === "conflict") {
+        retryQueued = false;
+        appJotaiStore.set(saveStatusAtom, { status: "conflict" });
+        return;
+      }
+      baseline = { drawingId, revision: result.revision, serialized };
+    }
+    if (pendingFiles && fileManager) {
+      uploading = true;
+      appJotaiStore.set(saveStatusAtom, { status: "uploading" });
+      const result = await fileManager.saveFiles({
+        elements: activeElements,
+        files,
+      });
+      if (!isCurrent()) {
+        return;
+      }
+      if (result.erroredFiles.size) {
+        throw new Error(
+          "일부 이미지를 업로드하지 못했습니다. 다시 시도하세요.",
+        );
+      }
+    }
+    if (missingFiles) {
+      uploading = true;
+      throw new Error("이미지 데이터가 없어 저장 완료를 확인할 수 없습니다.");
+    }
+    if (!isCurrent()) {
+      return;
+    }
+    if (latestSnapshot !== snapshot) {
+      // A later edit must be saved before its recovery draft is discarded.
+      retryQueued = true;
+      appJotaiStore.set(saveStatusAtom, { status: "saving" });
+      return;
+    }
+    debouncedLocalDraftSave.flush();
+    await clearSavedDraft(drawingId, generationAtStart, snapshot);
+    if (isCurrent() && latestSnapshot === snapshot) {
+      appJotaiStore.set(saveStatusAtom, { status: "saved", at: Date.now() });
+    } else if (isCurrent()) {
+      retryQueued = true;
     }
   } catch (e: any) {
     const current = getCurrentDrawing();
@@ -209,7 +306,7 @@ const performSave = async () => {
         appJotaiStore.set(saveStatusAtom, { status: "offline" });
       } else {
         appJotaiStore.set(saveStatusAtom, {
-          status: "error",
+          status: uploading ? "file-error" : "error",
           message: e?.message ?? String(e),
         });
       }
@@ -225,12 +322,27 @@ const performSave = async () => {
 };
 
 const debouncedLocalDraftSave = debounce(
-  (
-    drawingId: string,
-    elements: readonly ExcalidrawElement[],
-    appState: CloudAppState,
-  ) => {
-    void saveLocalDraft(drawingId, elements, appState);
+  (drawingId: string, generation: number, snapshot: Snapshot) => {
+    snapshot.draftWrite = saveLocalDraft(
+      drawingId,
+      snapshot.elements,
+      snapshot.appState,
+      snapshot.files,
+      snapshot.token,
+    )
+      .then(() => {
+        const current = getCurrentDrawing();
+        if (
+          current.drawingId === drawingId &&
+          current.generation === generation
+        ) {
+          appJotaiStore.set(localDraftErrorAtom, null);
+        }
+      })
+      .catch(() => reportDraftError(drawingId, generation))
+      .finally(() => {
+        snapshot.draftPending = false;
+      });
   },
   300,
 );
@@ -254,13 +366,22 @@ export const scheduleAutosave = (
   if (!isCloudConfigured || isAutosavePaused()) {
     return;
   }
-  const { drawingId } = getCurrentDrawing();
-  if (!drawingId) {
+  const { drawingId, generation } = getCurrentDrawing();
+  if (
+    !drawingId ||
+    appJotaiStore.get(localDraftPromptAtom)?.drawingId === drawingId
+  ) {
     return;
   }
 
-  latestSnapshot = { elements, appState, files };
-  debouncedLocalDraftSave(drawingId, elements, appState);
+  latestSnapshot = {
+    elements,
+    appState,
+    files,
+    token: randomId(),
+    draftPending: true,
+  };
+  debouncedLocalDraftSave(drawingId, generation, latestSnapshot);
   debouncedCloudSave();
 };
 

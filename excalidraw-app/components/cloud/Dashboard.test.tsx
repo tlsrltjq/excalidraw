@@ -85,6 +85,9 @@ const drawing: CloudDrawing = {
 const api = {
   updateScene: vi.fn(),
   addFiles: vi.fn(),
+  getSceneElements: () => [],
+  getAppState: () => appState,
+  getFiles: () => ({}),
 } as unknown as ExcalidrawImperativeAPI;
 
 const renderDashboard = async () => {

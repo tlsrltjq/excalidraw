@@ -9,6 +9,11 @@
  */
 import { CaptureUpdateAction } from "@excalidraw/excalidraw";
 import { serializeAsJSON } from "@excalidraw/excalidraw/data/json";
+import { RetryIcon } from "@excalidraw/excalidraw/components/icons";
+import {
+  restoreAppState,
+  restoreElements,
+} from "@excalidraw/excalidraw/data/restore";
 import { useState } from "react";
 
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
@@ -22,8 +27,13 @@ import {
   saveStatusAtom,
   scheduleAutosave,
   flushAutosave,
+  getCurrentFileManager,
+  localDraftErrorAtom,
 } from "../../cloud/autosave";
-import { currentDrawingAtom } from "../../cloud/currentDrawing";
+import {
+  currentDrawingAtom,
+  getCurrentDrawing,
+} from "../../cloud/currentDrawing";
 import {
   createDrawing,
   getDrawing,
@@ -40,6 +50,7 @@ type Props = {
 
 export const CloudSaveStatus: React.FC<Props> = ({ excalidrawAPI }) => {
   const status = useAtomValue(saveStatusAtom);
+  const [draftError, setDraftError] = useAtom(localDraftErrorAtom);
   const currentDrawing = useAtomValue(currentDrawingAtom);
   const [localDraftPrompt, setLocalDraftPrompt] = useAtom(localDraftPromptAtom);
   const [busy, setBusy] = useState(false);
@@ -51,35 +62,71 @@ export const CloudSaveStatus: React.FC<Props> = ({ excalidrawAPI }) => {
 
   if (localDraftPrompt && localDraftPrompt.drawingId === drawingId) {
     const useLocalDraft = () => {
-      pauseAutosave();
-      excalidrawAPI.updateScene({
-        elements: localDraftPrompt.elements,
-        appState: localDraftPrompt.appState,
-        captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+      const generation = currentDrawing.generation;
+      const elements = restoreElements(localDraftPrompt.elements, null, {
+        repairBindings: true,
       });
-      setTimeout(resumeAutosave, 0);
-      setLocalDraftPrompt(null);
-      // this local draft is, by definition, not yet on the server — save it now.
-      scheduleAutosave(
-        localDraftPrompt.elements,
-        localDraftPrompt.appState,
-        {},
-      );
-      flushAutosave();
+      const appState = restoreAppState(localDraftPrompt.appState, null);
+      pauseAutosave();
+      let restored = false;
+      try {
+        excalidrawAPI.addFiles(Object.values(localDraftPrompt.files ?? {}));
+        excalidrawAPI.updateScene({
+          elements,
+          appState,
+          captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+        });
+        getCurrentFileManager()?.reset();
+        setLocalDraftPrompt(null);
+        restored = true;
+      } catch {
+        setDraftError("로컬 초안 복원에 실패했습니다. 초안은 보존됩니다.");
+      } finally {
+        setTimeout(() => {
+          resumeAutosave();
+          const current = getCurrentDrawing();
+          if (
+            restored &&
+            current.drawingId === drawingId &&
+            current.generation === generation
+          ) {
+            scheduleAutosave(
+              excalidrawAPI.getSceneElements(),
+              excalidrawAPI.getAppState(),
+              excalidrawAPI.getFiles(),
+            );
+            flushAutosave();
+          }
+        }, 0);
+      }
     };
 
-    const useServerVersion = () => {
-      void clearLocalDraft(drawingId);
-      setLocalDraftPrompt(null);
+    const useServerVersion = async () => {
+      setBusy(true);
+      try {
+        await clearLocalDraft(drawingId);
+        if (getCurrentDrawing().generation === currentDrawing.generation) {
+          setLocalDraftPrompt(null);
+        }
+      } catch {
+        if (getCurrentDrawing().generation === currentDrawing.generation) {
+          setDraftError(
+            "로컬 초안 정리에 실패했습니다. 저장 공간을 확인하세요.",
+          );
+        }
+      } finally {
+        setBusy(false);
+      }
     };
 
     return (
       <div className="personal-cloud-save-status personal-cloud-save-status--prompt">
         <span>이 그림에 저장되지 않은 로컬 변경사항이 있습니다.</span>
-        <button type="button" onClick={useLocalDraft}>
+        {draftError && <span role="alert">{draftError}</span>}
+        <button type="button" onClick={useLocalDraft} disabled={busy}>
           로컬 변경 사용
         </button>
-        <button type="button" onClick={useServerVersion}>
+        <button type="button" onClick={useServerVersion} disabled={busy}>
           서버 버전 사용
         </button>
       </div>
@@ -161,6 +208,8 @@ export const CloudSaveStatus: React.FC<Props> = ({ excalidrawAPI }) => {
             appState,
             files,
           );
+          scheduleAutosave(elements, appState, files);
+          flushAutosave();
         }
         // if it conflicted again (rare race), status stays "conflict" and
         // the user can just try again.
@@ -188,13 +237,20 @@ export const CloudSaveStatus: React.FC<Props> = ({ excalidrawAPI }) => {
   }
 
   const label = (() => {
+    if (draftError) {
+      return draftError;
+    }
     switch (status.status) {
       case "saving":
         return "저장 중…";
+      case "uploading":
+        return "이미지 업로드 중…";
+      case "file-error":
+        return status.message;
       case "saved":
         return "저장됨";
       case "offline":
-        return "오프라인 — 재연결되면 저장됩니다";
+        return "오프라인 — 연결 후 다시 시도하세요";
       case "error":
         return `저장 실패: ${status.message}`;
       default:
@@ -208,9 +264,31 @@ export const CloudSaveStatus: React.FC<Props> = ({ excalidrawAPI }) => {
 
   return (
     <div
-      className={`personal-cloud-save-status personal-cloud-save-status--${status.status}`}
+      className={`personal-cloud-save-status personal-cloud-save-status--${
+        draftError ? "error" : status.status
+      }`}
     >
-      {label}
+      <span role="status">{label}</span>
+      {(draftError ||
+        status.status === "file-error" ||
+        status.status === "error" ||
+        status.status === "offline") && (
+        <button
+          type="button"
+          aria-label="저장 다시 시도"
+          title="저장 다시 시도"
+          onClick={() => {
+            scheduleAutosave(
+              excalidrawAPI.getSceneElements(),
+              excalidrawAPI.getAppState(),
+              excalidrawAPI.getFiles(),
+            );
+            flushAutosave();
+          }}
+        >
+          {RetryIcon}
+        </button>
+      )}
     </div>
   );
 };

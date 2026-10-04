@@ -11,9 +11,11 @@
  * explicitly discards it) — never on failure, offline, or navigation, so a
  * crashed tab / failed save never silently loses work.
  */
-import { createStore, get, set, del } from "idb-keyval";
+import { createStore, get, set, del, promisifyRequest } from "idb-keyval";
+import { isInitializedImageElement } from "@excalidraw/element";
 
 import type { ExcalidrawElement } from "@excalidraw/element/types";
+import type { BinaryFiles } from "@excalidraw/excalidraw/types";
 
 import type { CloudAppState } from "./types";
 
@@ -23,18 +25,49 @@ export type LocalDraft = {
   elements: readonly ExcalidrawElement[];
   appState: CloudAppState;
   savedAt: number;
+  files?: BinaryFiles;
+  token?: string;
 };
 
 export const saveLocalDraft = (
   drawingId: string,
   elements: readonly ExcalidrawElement[],
   appState: CloudAppState,
-): Promise<void> =>
-  set(drawingId, { elements, appState, savedAt: Date.now() }, draftsStore);
+  files: BinaryFiles = {},
+  token?: string,
+): Promise<void> => {
+  const referencedFiles: BinaryFiles = {};
+  for (const element of elements) {
+    if (isInitializedImageElement(element) && files[element.fileId]) {
+      referencedFiles[element.fileId] = files[element.fileId];
+    }
+  }
+  return set(
+    drawingId,
+    { elements, appState, files: referencedFiles, token, savedAt: Date.now() },
+    draftsStore,
+  );
+};
 
 export const getLocalDraft = (
   drawingId: string,
 ): Promise<LocalDraft | undefined> => get(drawingId, draftsStore);
 
-export const clearLocalDraft = (drawingId: string): Promise<void> =>
-  del(drawingId, draftsStore);
+export const clearLocalDraft = (
+  drawingId: string,
+  expectedToken?: string,
+): Promise<void> => {
+  if (!expectedToken) {
+    return del(drawingId, draftsStore);
+  }
+  // Keep a newer draft (including one written by another tab).
+  return draftsStore("readwrite", (store) => {
+    store.get(drawingId).onsuccess = (event) => {
+      const draft = (event.target as IDBRequest<LocalDraft | undefined>).result;
+      if (draft?.token === expectedToken) {
+        store.delete(drawingId);
+      }
+    };
+    return promisifyRequest(store.transaction);
+  });
+};

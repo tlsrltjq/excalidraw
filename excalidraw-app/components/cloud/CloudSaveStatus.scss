@@ -16,6 +16,9 @@
     box-shadow: var(--shadow-island);
     font-size: 0.8125rem;
     color: var(--text-primary-color);
+    max-width: calc(100vw - 2rem);
+    box-sizing: border-box;
+    overflow-wrap: anywhere;
 
     button {
       font-size: 0.8125rem;
@@ -25,6 +28,12 @@
       background: var(--button-bg, transparent);
       color: var(--text-primary-color);
       cursor: pointer;
+
+      svg {
+        display: block;
+        width: 1rem;
+        height: 1rem;
+      }
 
       &:hover:not(:disabled) {
         background: var(--button-hover-bg);
@@ -41,7 +50,8 @@
       border-color: var(--color-warning, #f08c00);
     }
 
-    &--error {
+    &--error,
+    &--file-error {
       border-color: var(--color-danger);
       color: var(--color-danger);
     }

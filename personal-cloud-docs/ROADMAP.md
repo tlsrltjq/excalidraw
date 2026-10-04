@@ -522,14 +522,14 @@ migration 적용 후 실제 배포 주소에서 확인:
   [VALIDATION.md](./VALIDATION.md) 참고)
 - [x] 저장 후 새로고침 및 재로그인 후 데이터 보존 확인 (2026-09-29,
   기존 실사용 결과 포함; 탭 종료 중 저장 중단 시나리오는 미검증)
-- [ ] 전체 drawing Export Backup
+- [x] 전체 drawing Export Backup (현재 그림의 파일 다운로드/복원 및 새 Cloud 그림 저장 확인, 2026-10-04; 계정 일괄 백업은 별도 범위)
 - [x] 최소 version history 구현 (D-012 — 코드 완료, 아래 기록. migration 적용
   + 실제 복원 테스트는 사용자가 직접)
 - [x] 실제 Supabase 운영 DB의 적용된 RLS 정책 직접 조회 (2026-10-03,
   Safari SQL Editor에서 26개 metadata 항목 확인)
 - [x] Version History의 실제 복원 UI 수동 확인 (2026-10-03, 빈 상태 복원과
   복원 직전 도형으로 재복원 확인)
-- [ ] 이미지가 포함된 drawing의 PNG/SVG Export 확인
+- [x] 이미지가 포함된 drawing의 PNG/SVG Export 확인 (Safari 실제 다운로드/재열기, 2026-10-04)
 - [x] drawing 링크 로드 실패/권한 거부 UX 및 Cloud autosave 분리
   (2026-10-03, automated tests 통과)
 - [x] 로그인 상태의 없는 ID/삭제된 ID URL 경고 및 정상 URL 열기 수동 확인
@@ -561,6 +561,46 @@ autosave coordinator를 함께 검사하는 회귀 테스트를 포함해 전체
 재복원, 테스트 drawing 삭제를 확인했다. 사용자 관리자 로그인 후 Safari에서 운영
 RLS/권한/bucket/trigger 설정 조회도 완료했다. 이후 우선순위는 이미지 업로드 상태와
 실패 처리, 이미지 export, 저장 중 탭 종료 복구, 전체 backup/export 검증이다.
+
+### 2026-10-03 이미지 저장 상태 개선
+
+완료 조건과 비동기 위험은 DECISIONS D-013에 먼저 기록했다. scene과 파일이 모두 성공한 뒤에만 `저장됨`으로 표시하고, 업로드 중/실패 상태 및 수정 없이 재시도를 구현한다. 파일 재시도는 scene revision을 불필요하게 증가시키지 않는다. 신규 그림/복사본도 기존 이미지 업로드를 시작한다.
+
+- [x] 업로드 완료까지 single-flight 유지, partial error/Promise 거절 표시
+- [x] generation 검사 및 업로드 중 후속 편집 큐 처리
+- [x] 실패 시 초안 보존, 이미 동기화된 no-op 초안 정리
+- [x] 저장된 이미지의 Safari 새로고침 복원 확인
+- [x] 로컬 서버 실행/재시작, 관리형 DB 복구, Vercel 배포 절차 문서화 (`operations.md`)
+- [ ] 미업로드 binary의 문서별 로컬 복구, 저장 중 탭 종료/재연결 실기기 검증
+- [ ] 이미지 포함 export 및 전체 backup/복구 절차 검증
+
+현재 작업은 계속 Milestone 6이다. 운영 배포 완료와 구분하며 검증 명령/결과/남은 위험은 VALIDATION의 최신 기록을 따른다. 그 뒤 폴더/검색 등 Workspace 개선, 자체 협업 인프라, AI Gateway/Local LLM, MCP 단계로 진행한다.
+
+### 2026-10-04 이미지 초안 복구
+
+설계/완료 조건은 DECISIONS D-014를 따른다. scene과 참조 이미지 데이터를 같은 문서별 IndexedDB record에 저장한다. Cloud 파일 업로드 실패 후 새로 열었을 때 원격 scene과 같더라도 미업로드 bytes가 있으면 복구를 제안한다. 복구 선택은 이미지 추가와 restore API 적용 후 재업로드까지 연결한다.
+
+- [x] BinaryFiles를 포함한 초안 저장과 기존 record 호환
+- [x] snapshot token이 일치할 때만 초안 삭제 (다른 탭의 최신 초안 보존)
+- [x] 초안 조회/파일 다운로드의 generation 검사와 문서별 로딩 잠금
+- [x] IndexedDB 실패 표시, transaction 진행/업로드 중 종료 경고 연결
+- [x] 실제 IndexedDB 및 복구 UI 통합 회귀 테스트
+- [ ] Safari 강제 탭 종료/저장소 eviction/장애 주입 실기기 검증
+- [x] 이미지 포함 export와 전체 drawing backup/복원 검증 (2026-10-04 Safari 수동 확인)
+
+자동 테스트 통과는 OS 강제 종료 직전의 미완료 transaction까지 보장한다는 뜻이 아니다. 300ms debounce 이전 종료나 사용자가 종료 경고를 무시한 경우는 별도 위험으로 남긴다. 상세 결과는 VALIDATION에 기록한다.
+
+### 2026-10-04 이미지 export와 파일 백업 검증
+
+DECISIONS D-015의 범위에서 기존 API를 그대로 사용한다. `exportRecovery.test.ts`에 Cloud database scene + 파일 결합, `.excalidraw` 독립 복원, 다른 그림 파일 제외, SVG 이미지 bytes 포함, PNG/SVG 편집 데이터 복원, 일반 이미지와 편집 백업 구분을 검사한다.
+
+- [x] 이미지 포함 파일 백업/복원 자동 테스트 6개
+- [x] 기존 Cloud/이미지 export 회귀 테스트 포함 집중 검증
+- [x] 원본 Cloud를 덮어쓰지 않는 복원 절차 및 백업 한계 문서화
+- [x] Safari 실제 PNG/SVG/Excalidraw 다운로드 및 별도 비로그인 세션에서 파일 열기
+- [x] 복원본을 새 Cloud 그림으로 저장하고 새로고침 검증
+
+위 파일 백업 수동 검증은 완료했다. Milestone 6의 강제 종료/장애 주입 및 다른 계정 URL 오류 수동 항목 등은 별도로 남아 있다. 계정 전체 일괄 백업/버전 보존은 이번 검사에 포함되지 않는다.
 
 2026-10-03 후속 검증 결과:
 

@@ -107,6 +107,7 @@ import { CloudSaveStatus } from "./components/cloud/CloudSaveStatus";
 import {
   flushAutosave,
   getCurrentFileManager,
+  shouldPreventCloudUnload,
   scheduleAutosave,
 } from "./cloud/autosave";
 import { isCloudConfigured } from "./cloud/supabaseClient";
@@ -705,9 +706,10 @@ const ExcalidrawWrapper = () => {
 
       if (
         excalidrawAPI &&
-        (LocalData.fileStorage.shouldPreventUnload(
-          excalidrawAPI.getSceneElements(),
-        ) ||
+        (shouldPreventCloudUnload() ||
+          LocalData.fileStorage.shouldPreventUnload(
+            excalidrawAPI.getSceneElements(),
+          ) ||
           getCurrentFileManager()?.shouldPreventUnload(
             excalidrawAPI.getSceneElements(),
           ))
