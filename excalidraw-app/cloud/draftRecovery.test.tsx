@@ -32,6 +32,7 @@ import {
   scheduleAutosave,
 } from "./autosave";
 import { setCurrentDrawing } from "./currentDrawing";
+import { updateDrawingScene } from "./drawings";
 import {
   clearLocalDraft,
   getLocalDraft,
@@ -112,6 +113,11 @@ const api = {
 describe("image draft recovery across editor reloads", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(updateDrawingScene).mockResolvedValue({
+      status: "ok",
+      revision: 3,
+      updatedAt: "2026-10-04T00:00:00Z",
+    });
     editorElements = [];
     editorFiles = {};
     editorState = state;
@@ -181,6 +187,66 @@ describe("image draft recovery across editor reloads", () => {
     expect(appJotaiStore.get(localDraftPromptAtom)).toBeNull();
     expect(editorFiles[file.id]).toEqual(file);
   });
+
+  it.each([false, true])(
+    "retains a rejected scene write across reopen and failed recovery (online=%s)",
+    async (online) => {
+      const onlineSignal = vi
+        .spyOn(navigator, "onLine", "get")
+        .mockReturnValue(online);
+      const failedStatus = online ? "error" : "offline";
+      vi.mocked(updateDrawingScene).mockRejectedValueOnce(
+        new TypeError("Test transport unavailable"),
+      );
+      setCurrentDrawing(drawing.id);
+      primeAutosaveBaseline(drawing.id, 1, [], state, {});
+      scheduleAutosave([image], state, { [file.id]: file });
+      flushAutosave();
+      await waitFor(() =>
+        expect(appJotaiStore.get(saveStatusAtom).status).toBe(failedStatus),
+      );
+      expect(mocks.upload).not.toHaveBeenCalled();
+      expect((await getLocalDraft(drawing.id))?.files?.[file.id]).toEqual(file);
+
+      // Reset editor/coordinator memory, retaining the persisted draft.
+      clearAutosaveBaseline();
+      setCurrentDrawing(null);
+      editorElements = [];
+      editorFiles = {};
+      await openCloudDrawing(api, {
+        ...drawing,
+        sceneData: JSON.parse(serializeAsJSON([], state, {}, "database")),
+      });
+      expect(appJotaiStore.get(localDraftPromptAtom)?.files?.[file.id]).toEqual(
+        file,
+      );
+      render(
+        <Provider store={appJotaiStore}>
+          <CloudSaveStatus excalidrawAPI={api} />
+        </Provider>,
+      );
+      vi.mocked(updateDrawingScene).mockRejectedValueOnce(
+        new TypeError("Test recovery transport unavailable"),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "로컬 변경 사용" }));
+      await waitFor(() => expect(updateDrawingScene).toHaveBeenCalledTimes(2));
+      await waitFor(() =>
+        expect(appJotaiStore.get(saveStatusAtom).status).toBe(failedStatus),
+      );
+      expect((await getLocalDraft(drawing.id))?.files?.[file.id]).toEqual(file);
+      expect(mocks.upload).not.toHaveBeenCalled();
+
+      onlineSignal.mockReturnValue(true);
+      fireEvent.click(screen.getByRole("button", { name: "저장 다시 시도" }));
+      await waitFor(() =>
+        expect(appJotaiStore.get(saveStatusAtom).status).toBe("saved"),
+      );
+      expect(updateDrawingScene).toHaveBeenCalledTimes(3);
+      expect(mocks.upload).toHaveBeenCalledTimes(1);
+      expect(editorFiles[file.id]).toEqual(file);
+      expect(await getLocalDraft(drawing.id)).toBeUndefined();
+    },
+  );
 
   it("still offers legacy scene-only drafts without inventing image data", async () => {
     await saveLocalDraft(drawing.id, [], state);

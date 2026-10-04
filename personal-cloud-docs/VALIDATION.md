@@ -1,5 +1,17 @@
 # MVP 검증 기록
 
+## 2026-10-04 커밋 및 scene 저장 장애 복구 보강
+
+기존 이미지 저장/초안/백업 검증 변경을 `codex/cloud-file-save-status`의 `0387136c` (`feat(cloud): preserve image drafts and verify backup recovery`)에 커밋했다. push, 통합 브랜치 병합, 운영 배포는 하지 않았다.
+
+다음 작업으로 `draftRecovery.test.tsx`에 두 경우를 추가했다. scene UPDATE 요청이 실패할 때 online 신호가 false이면 offline, true이면 error로 표시된다. 둘 다 이미지 포함 초안을 유지한다. 편집기와 저장 coordinator 메모리를 초기화하고 이전 원격 scene을 열면 초안 복구 안내가 나타난다. 로컬 변경 사용 후 저장이 다시 실패해도 초안이 남으며, 저장 다시 시도 성공 후 파일 업로드와 초안 정리가 완료된다. 각 테스트 시작 때 scene UPDATE mock의 성공 응답을 명시해 앞 테스트의 mock 복원에 의존하지 않도록 했다.
+
+검사 결과: autosave 12개, draft recovery 9개, local draft store 5개, 총 26개 통과. typecheck, code lint, 가드레일(4개 변경 파일), diff check, 새 테스트/README/VALIDATION의 scoped Prettier 통과. 최초 lint는 새 테스트의 줄바꿈 1개로 실패해 해당 줄만 수정했다. 광범위 문서 Prettier는 기존 AGENTS/ARCHITECTURE/DECISIONS/ENGINEERING_GUARDRAILS/ROADMAP 포맷 부채로 실패했고 일괄 재포맷하지 않았다. product 코드, dependency, DB migration, upstream core 변경은 없다. 전체 app tests/build는 이번 테스트 전용 변경에서는 생략했다. 직전 제품 코드의 전체 1,898개 테스트/build 기록은 별도로 유지한다.
+
+검사 한계: 네트워크와 편집기 API는 mock이고 저장소 구현은 mock하지 않지만 테스트 환경의 `fake-indexeddb`를 사용한다. 이는 실제 Safari IndexedDB 디스크 내구성, 브라우저 재시작, 실제 네트워크 차단, OS crash 검사가 아니다. 자동 검사에서 제품 결함은 발견하지 못했다.
+
+Safari에서 테스트 복원본 URL과 로그인, 내 그림 목록 및 복원본 열기까지 확인했다. 웹 검사기 단축키는 검사기를 열지 못했고 개발자용 기능 메뉴가 보이지 않았다. 설정 변경 확인을 요청했으며 아직 응답이 없어 설정/네트워크를 변경하거나 장애를 주입하지 않았다. 탭 오프라인/닫기/재열기 수동 검사는 **미완료**다. 테스트 복원본은 유지했고 원본 삭제/덮어쓰기를 실행하지 않았다.
+
 ## 2026-10-04 이미지 export와 현재 그림 백업 검사
 
 이번 변경은 `excalidraw-app/cloud/exportRecovery.test.ts`와 개인 문서에 한정한다. 이전 작업의 미커밋 이미지 저장/초안 복구 코드를 유지했고 production 코드, upstream core, dependency, DB migration은 추가 수정하지 않았다. 완료 조건과 범위는 DECISIONS D-015에 먼저 기록했다.
