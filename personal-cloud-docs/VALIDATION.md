@@ -1,5 +1,166 @@
 # MVP 검증 기록
 
+## 2026-10-09 통합 및 배포 준비
+
+원격 fetch 결과 통합 기준선 `origin/personal-cloud`의 `dd1aa82c`가 현재 기능 브랜치의 조상임을 확인했다. force push/rebase/DB 재적용 없이 fast-forward 통합 가능한 상태다. 이번 범위에는 기존 URL 오류 안내, 이미지 초안/백업, scene 저장 실패 회귀 검사와 새로고침 수정/Workspace/메뉴 정리가 함께 포함된다. upstream core/dependency 변경은 없다.
+
+커밋 전 관련 자동 검사 3파일 14개와 비로그인 접근 하네스 자체 검사 6개 통과. 직전 동일 제품 코드의 typecheck/build 및 Safari 메뉴/검색 확인 결과를 재사용한다. 전체 suite/심화 장애 검사는 재실행하지 않는다. Vercel Safari 세션은 로그인 화면이므로 기존 프로젝트 계정 로그인을 요청했다. Preview/Production Source 확인 전에는 운영 반영 완료로 기록하지 않는다.
+
+## 2026-10-09 Workspace 구현 및 메뉴 정리
+
+사용자 요청으로 심화 안정화 검사를 보류하고 기능 구현을 우선했다(D-017). 기존 미커밋 새로고침 수정/접근 하네스는 보존한다. upstream core와 dependency, scene/파일 저장 프로토콜은 변경하지 않았다. commit/push/병합/운영 프론트 배포는 하지 않았다.
+
+- `cloud/folders.ts`: 폴더 CRUD 및 단일 upsert 기반 그림 이동. owner를 클라이언트에서 지정하지 않으며 조회/변경 실패를 표시한다.
+- `components/cloud/Dashboard.tsx`, `.scss`, `.test.tsx`: 한 단계 폴더 관리, 그림별 이동, 미분류, 제목 검색. 계정/목록 generation 확인 및 폴더 조회 실패 시 기존 그림 목록 유지. 신규 그림은 미분류에서 시작한다.
+- `components/AppMainMenu.tsx`: 요청한 Excalidraw+/GitHub/X/Discord/Sign up/Visual Debug 메뉴만 숨겼다. 개인 Cloud 로그인/내 그림과 기존 편집/내보내기/협업을 유지한다. 메뉴 밖 Plus 배너/command palette는 이번 범위가 아니다.
+- `20261009040000_create_workspace_folders.sql`: 기존 프로젝트 SQL Editor에서 적용 성공. 사전 두 테이블 부재를 확인했다. 별도 폴더/분류 테이블과 RLS를 추가하며 기존 drawings schema는 그대로다. 폴더 삭제는 관계만 제거하고 그림/이미지를 삭제하지 않는다.
+- DB rollback 검사 6항목 모두 true: 소유자 생성/배정, 다른 계정 폴더/관계 숨김, 자기 폴더에 다른 계정 그림 연결 거부, 폴더 삭제 후 그림 보존/미분류. 실제 두 JWT UI 검사가 아닌 DB authenticated 역할/claims 기반 검사다. 전체 transaction을 rollback해 시험 데이터는 남기지 않았다.
+- typecheck와 변경 코드 scoped lint 통과. 폴더 저장소/Dashboard/실제 초기화 관련 3파일 14개 검사 통과.
+- `yarn build` 통과. 기존 폰트/chunk/Browserslist/Node 경고는 남아 있다. 빌드 중 개발 서버를 잠시 중지한 뒤 같은 `http://127.0.0.1:3001/`에 다시 시작했다.
+- Safari 기존 TEST 탭에서 메뉴의 요청 항목 부재, 개인 내 그림/로그아웃 유지, 폴더 도구 활성화/그림별 미분류 선택 상자, 제목 검색 `backup`의 1행 필터 및 검색 해제 후 2행 복귀를 확인했다. 데스크톱 화면의 텍스트/도구 겹침은 없었다. 실제 폴더 생성/이동/삭제 UI 및 모바일 화면은 이번 수동 검사에서 실행하지 않았다. DB rollback과 자동 검사 결과와 구분한다. 기존 그림/이미지를 수정하거나 삭제하지 않았다.
+
+생략/남은 범위: 전체 app suite/전체 lint 재실행, 두 계정 폴더 UI 대조, 다른 기기/느린 응답/장애 주입, 중첩 폴더/공유/일괄 이동/계정 일괄 백업. 기존 안정화 미검증 항목은 유지하며 Milestone 6 전체 완료로 표시하지 않는다.
+
+## 2026-10-09 Storage 삭제 격리 및 TEST PNG 정리
+
+사용자가 직전 생성한 합성 TEST PNG의 삭제 검사/최종 정리를 승인했다. 대상은 2×2 PNG 한 개로 고정했으며 기존 그림/버전/metadata에서 참조하는 이미지는 삭제하지 않았다.
+
+- Safari 개인정보 보호 창의 다른 로그인 계정으로 기존 SDK remove([정확한 TEST 경로])를 호출했다. 오류는 없지만 returnedObjects는 0이었다. HTTP 성공 응답을 실제 삭제나 명시적 권한 오류로 오인하지 않는다.
+- 소유자 창에서 PNG를 다시 다운로드해 생성 bytes와 일치를 확인했다. 다만 이 요청은 캐시를 우회하지 않았으므로 독립적인 서버 보존 증거로 단정하지 않는다. 이어 metadata 참조 0행을 확인하고 소유자 remove로 실제 1개 삭제 응답을 받았다. 다른 계정 0개/소유자 1개 대조가 삭제 격리 증거다.
+- 소유자 목록에서는 TEST 파일이 사라졌지만 일반 download는 bytes를 반환했다. cacheNonce에 신규 UUID와 fetch cache no-store를 함께 사용한 재요청에서는 data 없음, SDK status 400/statusCode 404/NoSuchKey를 확인했다. 서버 삭제 후 캐시 bytes가 남을 수 있으며 이를 RLS 우회/서버 삭제 실패로 확정하지 않는다. 기존 수신 bytes나 브라우저 캐시까지 원격 삭제로 회수되는 것은 아니다.
+- TEST 컨텍스트는 두 창 모두 제거했고 검사기를 닫았다. 기존 그림 제목/초 단위 수정 시각 유지와 기존 이미지의 cacheNonce/no-store 다운로드 성공을 확인했다. Safari 화면의 기존 빨간 이미지도 그대로다. 서버/로그인/원본/기존 백업은 유지한다.
+
+이번 변경은 문서와 수동 Storage 요청이다. 가드레일 12개 변경 파일, diff check, README/VALIDATION/operations scoped Prettier 통과. 제품 코드/하네스/migration/정책/commit/배포 변경은 없다. app typecheck/전체 lint/tests/build는 재실행하지 않는다. 실제 JWT metadata 쓰기/서명 URL, 두 탭 local scene/지연 파일, 강제 종료/eviction 및 캐시 없는 다른 기기 복원은 남긴다. Milestone 6 전체 완료는 아니다.
+
+## 2026-10-09 파일 metadata 및 Storage 쓰기 검사
+
+Milestone 6. 제품 코드/정책/migration/dependency/upstream core/commit/배포는 변경하지 않았다. 기존 미커밋 작업을 유지하고 `check-file-write-isolation.sql` 하네스를 추가했다.
+
+### DB metadata
+
+Safari 관리자 SQL Editor에서 하네스와 같은 전체 transaction을 실행했다. TEST 복원본의 실제 metadata 하나, DB의 실제 존재하는 다른 사용자 ID, 원 scene을 복사한 transaction 한정 임시 외부 parent 그림을 사용했다. 계정/scene 값을 결과나 fixture에 출력하지 않는다. 실제 사용자 JWT 요청이 아닌 DB 역할/claims 검사다.
+
+13항목 모두 true: bypass 없는 authenticated 역할, file CRUD grants, 소유자 metadata INSERT/UPDATE/DELETE 각 1행, 다른 사용자 UPDATE/DELETE 각 0행, owner 위조 INSERT/parent 위조 INSERT 및 file owner 변경/foreign parent 변경/drawing owner 변경의 42501 거부, 원 metadata 전체 JSON 일치. 기존 file ID/경로/content를 영구 재작성하지 않았다.
+
+각 mutation은 subtransaction으로 취소되고 전체 transaction도 rollback했다. 후속 보존 조회 5항목 모두 true: context/result 없음, 임시 parent 없음, probe metadata 없음, 원 TEST 그림의 제목/수정 시각 유지. 임시 parent는 실제 FK 대상이므로 parent/owner 거부를 FK 오류로 오인하지 않는다. 실제 binary 파일의 삭제는 수행하지 않았다.
+
+### Storage HTTP
+
+기존 Safari 일반/개인정보 보호 창의 SDK client로 실제 두 계정 요청을 비교했다. 원본 scene/버전/metadata에 연결하지 않은 2×2 합성 PNG 한 개를 신규 `TEST-storage-rls-*` 경로에 생성했다. 소유자 upload(upsert false)와 update 모두 성공했다. 다른 계정은 별도 신규 TEST 경로 생성과 이 합성 PNG update 모두 오류로 거부됐다(SDK status 400/statusCode 403, new row violates row-level security policy). 기존 실제 이미지는 대상이 아니다.
+
+후속 소유자 다운로드에서 합성 PNG의 bytes가 생성본과 완전히 같음을 확인했고, 소유자 목록에서 거부된 새 파일 이름의 부재를 확인했다. 합성 PNG 한 개는 현재 남아 있다. 다른 계정 삭제 차단 검사 및 소유자 최종 영구 삭제에 대한 확인을 요청했다. 삭제 검사/정리 완료로 기록하지 않는다. signed URL 및 실제 metadata JWT 쓰기 요청은 별도다. 검사기는 모두 닫고 두 창의 로그인/캔버스와 dev 서버는 유지했다.
+
+검증: 새 SQL과 동일한 transaction 실실행 13항목 및 rollback 뒤 보존 5항목 통과, 가드레일 12개 변경 파일, diff check, README/VALIDATION/operations scoped Prettier 통과. 하네스 SQL/문서와 수동 요청만 변경해 app typecheck/전체 lint/test/build는 재실행하지 않았다. SQL Editor의 private snippet에는 검사 SQL이 남을 수 있다. ROADMAP/DECISIONS 전체 포맷 부채는 일괄 정리하지 않았다.
+
+## 2026-10-09 실제 두 계정 Storage 다운로드 격리
+
+사용자가 Safari 개인정보 보호 창의 다른 계정 로그인을 완료했다. 일반/개인정보 보호 창 모두 기존 로컬 origin을 사용했다. 페이지의 기존 SDK client로 읽기만 실행했으며 JWT/암호를 추출하거나 로그인/설정을 변경하지 않았다.
+
+- 일반 창에서 TEST 복원본의 파일 metadata 한 건을 조회하고, 해당 경로를 기존 Storage SDK download로 요청했다. 다운로드 성공 및 nonempty bytes를 확인했다. scene/이미지 bytes/credential은 출력하지 않았다.
+- 개인정보 보호 창의 앱 인증 상태 signed-in과 사용자 ID가 파일 경로의 소유자 ID와 다르다는 boolean을 확인했다. 이메일/사용자 ID는 검증 문서에 기록하지 않는다.
+- 동일한 bucket/path에 대한 다른 계정 download는 data 없음과 오류를 반환했다. SDK error의 status는 400, statusCode는 404, code는 NoSuchKey, message는 Object not found였다. 403/42501 권한 오류로 잘못 기록하지 않는다. 소유자의 같은 경로 nonempty 성공과 대조한 실제 접근 격리 결과다.
+- 다른 계정의 해당 drawing_files ID 조회는 오류 없이 0행이었다. table RLS의 숨김 결과와 Storage 다운로드 차단을 별개로 확인했다.
+- 다운로드 응답은 검증 후 버리고 OS 파일로 저장하지 않았다. 시험용 경로만 검사기에서 확인했으며 문서/fixture에는 넣지 않았다. 검사기를 닫았고 두 창의 로그인/캔버스/원본을 유지했다. 데이터 생성/편집/삭제, 임시 fetch hook, DB 정책 변경은 없다.
+
+남은 범위: 파일 metadata INSERT/UPDATE/DELETE, owner 변경 WITH CHECK, Storage 업로드/덮어쓰기/삭제 및 서명 URL은 이번 읽기 검사에 포함하지 않는다. Storage 오류가 존재를 숨긴 것으로 해석할 수 있지만 모든 오류를 권한 차단으로 처리하는 일반 판정 규칙은 아니다. Milestone 6 전체 완료/운영 최신 배포는 아니다.
+
+검증은 실제 Safari의 읽기 요청과 문서 변경이다. 가드레일(11개 변경 파일), diff check, README/VALIDATION/operations scoped Prettier 통과. 제품 코드/하네스 코드를 바꾸지 않아 typecheck/lint/app tests/build는 재실행하지 않는다. 직전 URL 자동 검사 12개/Node 하네스 6개 및 전체 앱 검증 기록은 아래 항목을 따른다.
+
+## 2026-10-09 URL 통신 장애 및 rollback DB 권한 검사
+
+Milestone 6 후속 검증이다. 기존 미커밋 변경은 유지한다. 이번 추가 범위는 하네스 SQL과 문서이며 제품 코드/정책/migration/로그인/배포/commit 변경은 없다.
+
+- Safari 로컬 TEST 탭의 특정 drawing GET을 TypeError로 거부했다. 기존 로그인 자체는 바꾸지 않고 앱의 준비 상태를 잠시 loading으로 전환해 URL 로더를 재실행했다. 실제 회선 장애/신규 로그인/최초 페이지 진입 검사는 아니다.
+- 오류 안내가 통신/접근 확인, 요청 그림의 내용이 아님, Cloud 자동 저장 연결 해제를 명시했다. 안전 metadata 확인 결과 실패 GET 4회(SDK 재시도 포함), 차단된 쓰기 0회, 현재 drawing 연결 null이었다. HTTP 권한 거부로 판정하지 않는다.
+- fetch hook을 원복하고 제거 여부 true를 확인했다. 검사기를 닫고 TEST 복원본을 다시 열어 정상 URL과 빨간 이미지 표시를 확인했다. 그림 생성/편집/삭제는 없었다. 오류 동안 기존 이미지의 시각적 보존 및 오류 뒤 편집은 이번 Safari 검사로 입증하지 않는다. 관련 자동 검사와 구분한다.
+- `check-rls-isolation.sql`과 같은 SQL을 Safari의 해당 프로젝트 관리자 SQL Editor에서 전체 실행했다. authenticated 역할/임시 claims로 검사했으며 service role 또는 JWT를 출력/추출하지 않았다. TEST 복원본 하나만 대상으로 한다.
+- 13항목 모두 true: bypass 없는 authenticated 역할, drawing CRUD grants, 소유자의 그림/파일 metadata/버전/참조 Storage 가시성, 임시 다른 사용자 ID의 네 종류 읽기 차단, 그림 UPDATE/DELETE 0행, 소유자 위조 INSERT 거부. INSERT의 42501만 거부로 인정하고 다른 오류는 성공으로 처리하지 않는다.
+- 각각의 쓰기는 예외 subtransaction으로 항상 취소하고 전체 BEGIN/ROLLBACK도 사용했다. 후속 읽기 SQL의 4항목 모두 true: 임시 context/result 없음, TEST 그림의 제목/초 단위 수정 시각(2026-10-04 20:33:16 KST) 유지, probe 그림 미존재. SQL Editor의 private 검사 snippet은 자동 저장될 수 있지만 실제 scene/owner/credential 값은 SQL 본문에 없다.
+
+검증: URL 로더/Dashboard/실제 초기화 3파일 12개 통과, Node 비로그인 하네스 6개 통과. 가드레일 11개 변경 파일, diff check, README/VALIDATION/operations scoped Prettier 통과. 이번 하네스/문서 추가에 app typecheck/전체 lint/전체 test/build는 재실행하지 않는다. 같은 제품 코드의 직전 전체 검증은 아래 초기화 경합 수정 기록을 따른다. ROADMAP/DECISIONS의 기존 전체 포맷 부채는 일괄 수정하지 않았다.
+
+남은 범위: 임시 DB claims는 실제 다른 계정 JWT/Storage HTTP 서비스 검사가 아니다. 파일 metadata INSERT/UPDATE/DELETE, 소유자 변경 UPDATE WITH CHECK, Storage 업로드/삭제/서명 URL, 강제 종료/eviction 및 다른 기기 복원은 별도다. 실제 두 계정 Storage 검사에 필요한 Safari 개인정보 보호 창의 다른 계정 로그인을 요청했다. 로컬 서버/TEST 그림은 유지하며 Milestone 6 전체 완료로 판정하지 않는다.
+
+## 2026-10-09 Cloud URL 초기화 경합 수정
+
+Milestone 6 / D-016. 이전 미커밋 문서와 비로그인 하네스는 유지한다. commit/push/병합/운영 배포/DB migration/dependency/upstream core 변경은 없다.
+
+### 원인과 수정
+
+편집기 API는 initialData 적용 완료 전부터 사용할 수 있었다. Dashboard는 API 존재만 확인하고 Cloud 그림을 먼저 열었고, 나중에 core 초기화가 빈 로컬 elements를 적용해 원격 scene을 덮을 수 있었다. 새 `Dashboard.initialization.test.tsx`에서 실제 Excalidraw와 지연된 initialData를 연결해 수정 전 최종 elements가 빈 배열이 되는 실패를 재현했다. 원격 DB 요청/초안 저장소는 mock 경계이며 core 편집기는 mock하지 않았다.
+
+- `components/cloud/Dashboard.tsx`: 공개 getAppState/onChange API로 initialData 적용 완료를 기다린 뒤 URL을 연다. 준비 구독은 완료/교체/unmount 때 해제하며 기존 Strict Mode/계정/generation 검사를 유지한다.
+- `App.tsx`: Cloud drawing이 연결된 탭에는 다른 탭의 전역 LocalData 동기화를 적용하지 않는다. 초기/탭 동기화 로컬 이미지 조회의 늦은 응답은 drawingId와 generation을 검사하고 버린다. 익명 local-first의 기존 경로는 유지한다.
+- `Dashboard.initialization.test.tsx`: 초기 인증 완료/인증 로딩의 두 경우, 지연된 빈 initialData, 실제 편집기, Strict Mode에서 초기화 후 원격 elements 유지와 단일 URL 조회를 검사한다.
+- README/ROADMAP/DECISIONS/VALIDATION/operations: 로컬 수정 결과와 미검증 범위를 기록한다.
+
+### 검증
+
+- `yarn test:typecheck`, `yarn test:code`, `yarn build`: 통과. 기존 MetaProperty parser, 폰트/chunk/Browserslist 및 Node deprecation 경고는 남아 있다.
+- 전체 `yarn test:app --watch=false`: 128 files, 1,902 passed, 47 skipped, 1 todo. 준비 구독 cleanup 조건의 마지막 소규모 변경 후 Dashboard/실제 초기화 8개와 scoped lint를 다시 확인했다.
+- 가드레일(10개 변경 파일), `git diff --check`, 변경 코드와 README/VALIDATION/operations scoped Prettier 통과. 기존 ROADMAP/DECISIONS 전체 문서 포맷 부채는 일괄 수정하지 않았다.
+- Safari 기존 로그인 세션의 TEST 복원본 URL을 새 탭에서 직접 열었다. 이미지 자동 표시, 같은 탭 새로고침 두 번, 별도 새 탭에서 같은 URL 이미지 표시를 확인했다. 초안 안내/빈 캔버스/불필요한 종료 경고는 나타나지 않았다. 목록의 복원본 수정 시각은 2026-10-04 20:33:16으로 유지됐다.
+- 브라우저에서 데이터 생성/편집/삭제, 로그인 변경, 설정 변경, 장애 주입은 하지 않았다. 중복 검증 탭 하나만 닫았고 테스트 그림/원본은 유지했다. 로컬 dev 서버는 `http://127.0.0.1:3001/`에 시작했으며 계속 실행한다.
+
+생략/남은 위험: 이번 Safari 검사는 같은 브라우저의 캐시 있는 TEST 그림이다. 다른 기기 캐시 없는 복원, 서로 다른 전역 로컬 scene의 두 탭, 느린 로컬 파일 응답, 실제 장애에서 새 복구본 생성, 프로세스 강제 종료/eviction, 직접 Storage/쓰기 RLS, URL 네트워크 오류 UI는 별도다. 공유 hash/협업 실기기 검사는 재실행하지 않았고 기존 자동 전체 검사로 회귀 확인했다. 로컬 수정 확인은 운영 배포 완료나 Milestone 6 전체 종료를 의미하지 않는다.
+
+## 2026-10-06 문서 정리 및 인계
+
+이번 작업은 기존 Git 상태와 검증 기록을 대조한 문서 정리다. 제품 코드 변경, 브라우저 재검사, 운영 DB 요청/설정 변경, 데이터 정리, 서버 재시작/종료, commit/push/병합/배포는 하지 않는다. 마지막 수동 검사는 아래 2026-10-04 Safari 기록이다. 과거 항목의 대기/미완료 표현은 당시 상태이며 현재 요약은 README/ROADMAP을 따른다.
+
+- 완료한 범위: 기반 Cloud 기능, 최소 버전 기록 복원, 이미지 저장 상태/재시도, 이미지 포함 초안 및 현재 그림 백업, 두 계정 URL/목록 격리, 비로그인 table 조회 거부
+- 최신 자동 앱 검증 기록: 127 files, 1,900 passed, 47 skipped, 1 todo. 이는 2026-10-04 기록이지 이번 전체 테스트 재실행 결과가 아니다.
+- 최우선 미해결: Safari에서 복구 뒤 URL 새로고침 시 빈 캔버스 두 번 재현. 내 그림 재열기는 정상. 원인/데이터 유실은 미확정이며 초기화 전체 경로의 회귀 테스트와 원인 조사부터 재개한다.
+- 미검증: URL 네트워크 오류 UI, 직접 Storage/쓰기/삭제 RLS, 프로세스 강제 종료/eviction 및 다른 기기 캐시 없는 파일 복원
+- 인계 상태: `codex/cloud-file-save-status`, HEAD `737c21a8`, 기능 커밋 `0387136c`. 후속 문서 및 비로그인 하네스 두 파일은 미커밋 상태로 유지한다. 운영 배포된 코드와 동일하다고 가정하지 않는다.
+
+수정 문서: README(현황/재개 순서), ROADMAP(오래된 체크리스트 정합성), DECISIONS(초안 검증 한계), VALIDATION(마무리 기록). operations의 실행/재시작/백업 가이드는 유지한다. typecheck/앱 lint/전체 app tests/build는 문서-only 정리라 생략한다. 기존 문서 전체 포맷 부채는 이번 작업에서 일괄 재포맷하지 않는다.
+
+이번 문서 검사: `node personal-cloud-harness/check-guardrails.mjs`(7개 변경 파일), `git diff --check`, README/VALIDATION scoped Prettier 모두 통과했다. ROADMAP/DECISIONS 전체 Prettier는 기존 형식 부채 때문에 이번에는 검사하지 않았다.
+
+## 2026-10-04 Safari 업로드 장애와 초안 재열기
+
+사용자가 Safari 개발자용 기능을 켠 뒤 일반 창의 테스트 복원본 `df912b92-80e3-46d8-8fd4-dd2160180cdd`만 사용했다. Chrome은 사용하지 않았다. 중단돼 있던 로컬 Vite 서버를 기존 origin `http://127.0.0.1:3001/`에 재시작했다. 제품 코드, dependency, migration, 운영 배포는 변경하지 않았다.
+
+- Safari 웹 검사기에서 해당 테스트 drawing의 Storage POST/PUT만 실패하도록 탭의 fetch를 임시 감쌌다. navigator.onLine도 false로 주입했다. scene 저장 요청은 차단하지 않았으며 노트북 Wi-Fi나 Supabase 설정은 변경하지 않았다. 실제 회선 단절/서비스 장애와는 구분한다.
+- 기존 테스트 export PNG를 이미지 도구로 추가했다. 업로드 차단 횟수 2와 offline 신호를 확인했고 `오프라인 — 연결 후 다시 시도하세요` 및 `저장 다시 시도`가 표시됐다.
+- 실제 탭 닫기와 종료 경고의 페이지 나가기를 실행했다. 탭 수가 4개에서 3개로 줄었고 새 탭에서 같은 URL을 열자 4개가 됐다. 다른 일반 창 탭과 두 번째 계정 창은 유지했다.
+- 재열기 후 원격 화면의 누락 이미지 placeholder와 `이 그림에 저장되지 않은 로컬 변경사항이 있습니다` 안내를 확인했다. `로컬 변경 사용` 뒤 실제 빨간 테스트 이미지, `이미지 업로드 중…`, 이어 `저장됨`을 확인했다. 이는 실제 Safari의 문서별 IndexedDB 초안 재열기/이미지 재업로드 확인이다.
+- 새로고침 후 콘솔에서 임시 hook이 undefined이고 navigator.onLine이 true인 것을 확인했다. 검사기를 닫았으며 요청 실패 주입은 남지 않았다. 사용자가 켠 개발자용 기능 설정 자체는 그대로 유지했다.
+
+### 발견한 미해결 문제
+
+복구 완료 뒤 같은 URL 새로고침에서 캔버스가 빈 화면으로 표시됐다. 내 그림 목록에서 복원본을 다시 열면 빨간 이미지가 정상 표시됐다. 이를 반복해 두 번 재현했고 테스트 탭은 목록에서 다시 열어 이미지가 보이는 상태로 남겼다. 목록의 수정 시각은 두 번 모두 재업로드 완료 시각으로 유지됐다. 서버 그림이 삭제됐다는 증거는 없지만 새로고침 자동 표시 검사는 실패로 기록한다. 새로고침마다 종료 경고도 나타났으며 그 원인은 별도 확인이 필요하다.
+
+우선 조사 위치는 `App.tsx`의 initializeScene/initialStatePromise 및 LocalData 탭 동기화, `Dashboard.tsx`의 URL 자동 열기 effect, `openDrawing.ts`의 generation/잠금이다. 초기 로컬 복원과 Cloud 열기의 순서 또는 여러 탭 동기화는 후보이지 확정 원인이 아니다. 초기화 전체 경로를 재현하는 회귀 테스트 후 수정한다.
+
+변경 문서: README, ROADMAP, VALIDATION, operations. 원본 테스트 그림/사용자 데이터는 삭제하거나 덮어쓰지 않았다. 테스트 복원본에는 이번 새 이미지가 저장돼 있다. 프로세스 강제 종료, 저장소 eviction, 실제 회선 단절, 다른 기기 캐시 없는 파일 복원, 직접 Storage/UPDATE/DELETE RLS 검사는 생략했다. 문서-only 후속 변경이므로 typecheck/lint/전체 app tests/build는 재실행하지 않는다. Milestone 6 전체 완료로 판정하지 않는다.
+
+문서 검증: 가드레일(7개 변경 파일), `git diff --check`, README/VALIDATION/operations scoped Prettier 통과. `yarn prettier --check ...`는 저장소 script의 전체 glob까지 검사해 기존 AGENTS/ARCHITECTURE/DECISIONS/ENGINEERING_GUARDRAILS/ROADMAP 형식 차이로 실패했다. 직접 Prettier 실행으로 scoped 검사를 분리했고 기존 문서 전체 재포맷은 하지 않았다.
+
+## 2026-10-04 두 번째 계정 URL 및 접근 검사 하네스
+
+Safari 개인정보 보호 창에서 Google 로그인 화면을 열었고, 사용자가 일반 창과 다른 계정으로 인증을 완료했다. 메뉴의 로그인 계정이 다름을 확인한 후 원 계정 테스트 복원본 `df912b92-80e3-46d8-8fd4-dd2160180cdd`의 URL을 다시 열었다. 찾을 수 없음/권한 없음 안내와 Cloud 자동 저장 연결 해제 설명이 표시됐고, 테스트 복원본은 두 번째 계정의 내 그림 목록에 없었다. 두 번째 계정의 기존 그림은 열거나 수정하지 않았다. 계정 이메일/credential/scene은 문서나 fixture에 기록하지 않았다.
+
+이 결과는 다른 계정 소유 drawing URL의 실제 UI 거부 확인이다. 네트워크 요청을 직접 캡처해 파일 다운로드/UPDATE/DELETE RLS까지 확인한 검사는 아니며 해당 범위는 여전히 별도다. 노트북 네트워크, Safari 설정, 운영 DB 정책은 변경하지 않았다. 개발자용 기능 설정 변경 확인에 답이 없어 테스트 탭 한정 장애 주입/초안 재열기는 미완료로 유지한다.
+
+`personal-cloud-harness/check-anonymous-access.mjs`에 비로그인 읽기 전용 table GET 검사를 추가했다. 예상 프로젝트 ref/HTTPS host/공개 키 종류를 검사한 후 세 table의 ID 컬럼만 요청한다. 401/403 + `42501`만 permission-denied로 처리하며 빈 200, 404, 잘못된 인증, 5xx, 통신 실패는 통과로 오인하지 않는다. 키/응답 본문/예외 상세를 출력하지 않는다. 새 dependency, 앱 코드, DB migration은 없다.
+
+검증: Node 하네스 테스트 6개 통과, 현재 Supabase 프로젝트 실제 실행은 세 table 모두 401 / permission-denied로 통과. 전체 앱 테스트도 다시 실행해 127 files, 1,900 passed, 47 skipped, 1 todo로 통과했다. Node 테스트 파일은 `.node-test.mjs`로 분리해 Vitest의 app test 수집에 섞이지 않게 했다. 가드레일, diff check, Node syntax 검사, 신규 하네스/README/VALIDATION/operations scoped Prettier 통과. scoped ESLint는 CLI console 출력 1개 경고를 표준 출력으로 수정한 뒤 통과했다. 하네스-only 변경이라 app typecheck/전체 lint/build는 생략했다. ROADMAP/DECISIONS의 기존 문서 전체 포맷 부채는 정리하지 않았다. 운영 가이드에 재실행 명령과 검사 한계를 추가했다.
+
+## 2026-10-04 Safari 재개 및 비로그인 API 검사
+
+제품 코드 변경 없이 로컬 `127.0.0.1:3001`과 기존 Supabase에서 검사했다. 일반 창의 기존 원본/관리자 탭은 유지하고 `TEST 2026-10-04 backup-restore` 복원본만 사용했다.
+
+- 테스트 복원본의 편집 탭을 실제 닫은 뒤 새 탭에서 같은 drawing URL을 열었다. Safari 접근성 정보로 탭 수 감소/새 탭 증가를 확인했다. 이미지 선택/Crop 제어 및 빨간 테스트 이미지 픽셀을 확인했다. 정상 저장본의 같은 브라우저 재열기 검사이며, 미저장 초안/오프라인/프로세스 강제 종료 검사는 아니다.
+- 로그인된 테스트 탭에서 `00000000-0000-4000-8000-000000000000` URL을 열자 찾을 수 없음/권한 없음, 기존 캔버스가 요청 그림의 내용이 아님, Cloud 자동 저장 연결 해제 안내가 나타났다. 목록의 복원본을 열어 정상 URL과 이미지로 복귀했다. 오류 뒤 원본 삭제/덮어쓰기는 하지 않았다.
+- 기존 개인정보 보호 창은 잠겨 있어 사용자가 직접 잠금을 해제했다. 비로그인 창에서 복원본 URL을 열고 `Google로 로그인` 메뉴를 확인했다. Cloud 내 그림 메뉴는 표시되지 않았다. 비로그인 검사는 다른 로그인 계정의 접근 거부 또는 API 격리 검사를 대체하지 않는다.
+- 공개 publishable/anon key만 사용하는 읽기 전용 REST GET으로 `drawings`, `drawing_files`, `drawing_revisions`를 조회했다. 실제 프로젝트 host와 공개 키 종류를 먼저 확인했다. 세 요청 모두 HTTP 401, Postgres 오류 코드 `42501`로 거부됐다. 사용자 JWT/관리자 키를 사용하지 않았고 응답 본문, scene, credential은 로그/문서에 남기지 않았다. 비로그인 읽기 권한 확인이며 로그인 계정 간 RLS, Storage 객체 경로, 쓰기/삭제 권한 검증은 별도다.
+
+자동 검사: URL 로더 4개와 Dashboard 6개, 총 10개 통과. 가드레일(4개 변경 문서), diff check, README/VALIDATION scoped Prettier 통과. 제품 코드 변경이 없어 typecheck/lint/전체 app tests/build는 이번 수동 검사에서는 생략했다. 기존 ROADMAP/DECISIONS 문서 전체 형식 부채는 일괄 변경하지 않았다.
+
+남은 항목: 개인정보 보호 창의 두 번째 계정 로그인 후 같은 URL 접근 거부 확인, Safari 개발자용 기능 설정 변경 확인 후 탭 한정 요청 실패/초안 복구. 확인 응답 전에는 설정 변경/장애 주입을 하지 않았다. 노트북 Wi-Fi, Supabase RLS/DB, 운영 웹 배포는 변경하지 않았다. 테스트 복원본과 기존 다운로드 백업은 유지한다.
+
 ## 2026-10-04 커밋 및 scene 저장 장애 복구 보강
 
 기존 이미지 저장/초안/백업 검증 변경을 `codex/cloud-file-save-status`의 `0387136c` (`feat(cloud): preserve image drafts and verify backup recovery`)에 커밋했다. push, 통합 브랜치 병합, 운영 배포는 하지 않았다.
@@ -184,11 +345,11 @@ Milestone 6 / D-014. 이전 작업의 미커밋 변경을 유지하면서 `codex
 - `cloud/openDrawing.ts`: 로컬 초안과 원격 이미지를 조회한 뒤 같은 scene의 미업로드 bytes도 복구 대상으로 판정한다. 비교와 복원은 기존 restore API를 사용하며, 초기 로딩 중 편집은 완료 시 현재 editor snapshot을 큐에 전달한다.
 - `components/cloud/CloudSaveStatus.tsx`: 이미지 포함 복구와 재업로드, 실패 안내, 초안 삭제 실패 처리. 로컬 변경 복원 직후 잠금이 해제되기 전에 schedule이 무시되던 기존 경로도 수정한다.
 - `App.tsx`: 기존 beforeunload 경고에 Cloud 초안 transaction/로딩/저장 진행 여부를 추가한다.
-- `localDraftStore.test.ts`, `draftRecovery.test.tsx`, `autosave.test.ts`, `Dashboard.test.tsx`: 실제 IndexedDB 및 복구 UI 테스트, 기존 회귀 테스트 확장. docs는 README/ROADMAP/DECISIONS/operations/VALIDATION을 갱신한다. upstream core, dependency, DB migration은 변경하지 않는다.
+- `localDraftStore.test.ts`, `draftRecovery.test.tsx`, `autosave.test.ts`, `Dashboard.test.tsx`: fake-indexeddb 환경의 IndexedDB API 및 복구 UI 테스트, 기존 회귀 테스트 확장. docs는 README/ROADMAP/DECISIONS/operations/VALIDATION을 갱신한다. upstream core, dependency, DB migration은 변경하지 않는다.
 
 자동 검증:
 
-- 실제 IndexedDB: 이미지 bytes/참조 파일만 저장/문서 분리/legacy record/다른 탭의 최신 token 보존 5개 테스트
+- IndexedDB API(fake-indexeddb 환경): 이미지 bytes/참조 파일만 저장/문서 분리/legacy record/다른 탭의 최신 token 보존 5개 테스트
 - 복구 통합: 업로드 실패 후 editor files를 비워 재열기 → 같은 원격 JSON에서도 복구 안내 → 로컬 이미지 복원 → 재업로드 성공 → 초안 삭제; 정상 동기화 시 안내 없음; 구버전 초안; 늦은 파일 응답; IndexedDB 조회 실패; 늦은 초안 응답; editor 오류 시 잠금 해제 7개 테스트
 - autosave: local transaction 대기와 unload 판단, quota 실패와 재시도 등을 포함해 12개 테스트
 - Cloud/Dashboard 집중 검증: 34개 통과

@@ -75,7 +75,24 @@ ps -p <확인한_PID> -o pid,ppid,command
 
 DB 재시작을 위해 migration을 다시 실행하거나 `supabase db reset`, DROP TABLE, 프로젝트 삭제를 하지 않는다. 앱 재기동과 DB 초기화는 전혀 다른 작업이다. 이번 가이드 작성 과정에서 운영 DB를 실제 재시작하지 않았다.
 
+## 비로그인 접근 검사 재실행
+
+저장소 루트에서 아래 명령을 실행한다. 현재 Node v24 환경의 `--env-file`로 공개 설정을 읽고 대상 프로젝트 ref를 별도로 지정한다. 다른 프로젝트 URL이나 공개용이 아닌 키면 요청 전에 중단한다.
+
+```bash
+node --test personal-cloud-harness/check-anonymous-access.node-test.mjs
+node --env-file=.env.local personal-cloud-harness/check-anonymous-access.mjs dtptyzwjhvuvrsguspic
+```
+
+이 하네스는 사용자 JWT 없이 세 개인 table에 GET만 전송한다. 각 줄의 `outcome`이 `permission-denied`, HTTP가 401/403일 때만 기대한 결과다. 단순 200 빈 목록, 404, invalid key, 5xx, 통신 실패는 성공으로 처리하지 않고 exit code 1을 반환한다. 실패를 해결하려고 RLS를 끄거나 anon 권한을 추가하지 않는다. project ref/공개 환경변수와 운영 정책 조회 결과부터 점검한다.
+
+응답 본문, scene, key, 인증 토큰은 출력하지 않는다. 비로그인 읽기만 검사하므로 다른 로그인 계정의 그림/파일 접근, Storage 경로 및 쓰기/삭제 권한 검사는 별도로 진행해야 한다.
+
 ## DB migration 운영
+
+2026-10-09: `20261009040000_create_workspace_folders.sql`을 기존 프로젝트 SQL Editor에서 적용했다. `folders`, `drawing_folders` 두 테이블을 추가하며 기존 그림 schema/파일은 변경하지 않는다. 적용 전 두 테이블 부재, 적용 성공, authenticated 역할/claims 기반 rollback 검사 6항목 통과를 확인했다. 이미 적용했으므로 이 SQL을 다시 실행하지 않는다. CLI migration 이력 정합성은 아직 별도 작업이다.
+
+내 그림 화면에서 폴더를 생성/변경하고 각 그림의 선택 상자로 이동한다. 새 그림은 미분류에서 시작하며 폴더 삭제는 분류만 해제한다. 제목 검색은 현재 목록과 선택 폴더 안에서 동작한다. 폴더 조회 실패 시 기존 그림 목록은 유지되고 폴더 도구만 비활성화된다. 연결 오류를 확인한 뒤 재시도한다. 이전 프론트는 폴더를 표시하지 않지만 기존 그림을 계속 읽고 저장할 수 있다.
 
 기존 migration은 SQL Editor로 적용한 이력이 있다. Dashboard의 migration tracking이 비어 있어도 실제 테이블이 없는 뜻은 아니다. `supabase/migrations/README.md`와 적용 기록을 먼저 확인하고 현재 schema를 조회한다. 이미 적용된 SQL을 통째로 재실행하면 policy 중복 등으로 실패할 수 있다.
 
@@ -127,6 +144,8 @@ yarn --cwd excalidraw-app vite preview --host 127.0.0.1 --port 5000 --strictPort
 ### 미저장 이미지 복구
 
 이미지 업로드가 실패하면 동일 브라우저/origin의 문서별 IndexedDB 초안을 보존한다. 그림을 다시 열어 초안 안내가 나오면 `로컬 변경 사용`으로 이미지까지 복원하고 연결이 정상일 때 재업로드한다. 서버 버전 사용은 로컬 초안을 버리는 명시적 선택이므로 미저장 작업이 필요하면 먼저 파일로 내보낸다. 다른 origin/기기에서는 이 초안이 보이지 않는다.
+
+2026-10-04 Safari 검사에서 복구 후 새로고침의 빈 캔버스가 재현됐고, 2026-10-09 로컬에서 초기화 경합을 수정·재검증했다. 운영 반영은 별도다. 같은 URL이어도 빈 화면을 서버의 빈 그림으로 단정하지 않는다. 미저장 작업이 있다면 먼저 파일로 내보내고 `내 그림`에서 해당 그림을 다시 연다. 빈 화면을 새 그림/덮어쓰기로 저장하거나 사이트 데이터를 삭제하는 것은 복구 방법이 아니다. 상세 재현/수정 기록은 VALIDATION을 따른다.
 
 `로컬 복구 저장에 실패했습니다` 안내는 브라우저 저장소 차단/공간 부족 등으로 안전한 로컬 복구본을 만들지 못했다는 뜻이다. 미저장 캔버스를 즉시 `.excalidraw`로 내보내고 공간/권한을 확인한 뒤 저장 재시도를 누른다. 브라우저 사이트 데이터 삭제는 복구 절차가 아니며 남아 있는 초안까지 지운다. 쓰기 또는 업로드 중 종료 경고가 뜨면 작업 완료까지 기다린다. 강제 종료 전에 끝나지 않은 IndexedDB transaction은 복구를 보장할 수 없다.
 
@@ -182,3 +201,52 @@ yarn --cwd excalidraw-app vite preview --host 127.0.0.1 --port 5000 --strictPort
 ## 테스트 데이터 정리
 
 테스트 drawing은 생성 당시의 ID로 추적한다. 삭제 후 `내 그림`에서 사라지고, 해당 URL을 새로 열었을 때 찾을 수 없음/접근 불가 안내가 나오는지 확인한다. Storage binary의 orphan 정리는 이 절차에 포함하지 않는다. 해당 보존 정책은 DECISIONS.md D-011을 따른다.
+
+## DB 권한 Rollback 검사 (2026-10-09)
+
+`personal-cloud-harness/check-rls-isolation.sql`은 migration이 아닌 수동 검증 하네스다. 운영 설정을 바꾸거나 RLS를 끄지 않는다.
+
+1. Safari에서 Supabase의 personal-excalidraw 프로젝트(ref `dtptyzwjhvuvrsguspic`) SQL Editor를 연다. 다른 프로젝트에서 실행하지 않는다.
+2. 신규 private query에 파일 **전체**를 넣고 실행한다. 일부 선택 실행, 끝의 `rollback` 제거, `commit` 추가는 금지한다.
+3. 대상은 ID와 제목 모두 일치하는 `TEST 2026-10-04 backup-restore` 한 개다. 없으면 중단하며 실제 사용자 그림으로 대체하지 않는다. 테스트 중 같은 그림을 편집하지 않는다.
+4. 13개의 `passed`가 모두 true인지 확인한다. 소유자 읽기 positive control까지 true여야 격리 검사가 유효하다. 오류/false/null은 통과가 아니다. 예상치 못한 오류 시 별도로 `rollback;`을 실행하고 원인을 확인한다.
+5. 원본 그림의 제목/수정 시각과 probe 미존재를 읽기 전용으로 확인한다. 실제 binary Storage 삭제 API는 사용하지 않는다.
+
+전체 transaction과 각 mutation의 subtransaction이 쓰기를 취소한다. 테스트 claims/임시 table/grant는 해당 transaction 안에서만 쓰고 영구 권한은 바꾸지 않는다. 결과는 이름/boolean뿐이며 scene, owner UUID, credential은 출력하지 않는다. SQL Editor는 쿼리 본문을 자동 저장할 수 있다.
+
+검사 범위는 DB 역할/임시 claims의 RLS다. 실제 사용자 JWT 유효성, Storage HTTP 다운로드/업로드/삭제, 파일 metadata 쓰기와 owner 변경은 따로 확인해야 한다. 2026-10-09 실행 결과 13항목 및 후속 보존 4항목 통과. 다른 계정 로그인은 Safari 개인정보 보호 창에서 수행하며 암호/토큰을 채팅으로 전달하지 않는다.
+
+## 실제 두 계정 Storage 읽기 대조
+
+일반 창과 Safari 개인정보 보호 창에서 같은 로컬 origin에 서로 다른 계정으로 로그인한다. 기존 앱의 Supabase client를 사용하고 인증값을 복사하지 않는다.
+
+1. 소유자 창에서 TEST drawing의 drawing_files 경로 한 건만 조회한다. 같은 경로의 Storage SDK download가 성공하고 bytes가 비어 있지 않아야 한다.
+2. 다른 창의 로그인 사용자가 해당 파일 소유자와 다르다는 boolean만 확인한다. 같은 bucket/path를 download하고, 오류/data 없음인지 확인한다. binary/이메일/credential을 로그에 남기지 않는다.
+3. 다른 계정에서 해당 drawing_files ID 조회가 오류 없이 0행인지 확인한다. 통신 오류나 없는 파일 실패만으로 RLS 통과를 판정하지 않는다.
+4. 검사기를 닫고 원본/로그인/설정을 유지한다. 쓰기/삭제 요청은 이 읽기 절차에 포함하지 않는다. 실제 사용자 파일이 아니라 기존 TEST 파일만 사용한다.
+
+2026-10-09 결과: 소유자 nonempty 성공, 다른 계정 data 없음 및 SDK status 400/statusCode 404/NoSuchKey, metadata 0행. 같은 경로의 소유자 성공이 있어 파일 미존재와 구분했다. 403이 아니어도 Storage 서비스가 다른 사용자의 object 존재를 숨길 수 있다. 이 읽기 결과는 Storage/metadata 쓰기 정책과 서명 URL 검사를 대체하지 않는다.
+
+## 파일 쓰기 권한 검사
+
+DB metadata 검사는 `personal-cloud-harness/check-file-write-isolation.sql` 전체를 대상 프로젝트의 관리자 SQL Editor에서 실행한다. TEST 복원본/파일과 다른 실제 사용자가 있어야 한다. 없으면 중단하고 실제 사용자 그림으로 대체하지 않는다. 전체 선택 실행/끝의 rollback 유지/오류 시 rollback 규칙은 위 DB 검사와 같다.
+
+13항목 모두 true여야 한다. 소유자 정상 CRUD는 각 1행, 다른 사용자 수정/삭제는 0행, owner/parent 위조와 변경은 42501이어야 한다. 실제 foreign parent는 transaction 안에서만 생성하고 각 쓰기도 취소한다. 원 metadata JSON 비교 결과가 true인지 확인한다. 결과를 실제 두 JWT의 HTTP 검사로 해석하지 않는다.
+
+Storage HTTP 쓰기는 기존 이미지로 검사하지 않는다. 별도 2×2 합성 PNG를 신규 TEST 경로에 만들고 scene/버전/metadata에 연결하지 않는다. 소유자 정상 생성/덮어쓰기와 다른 계정 생성/덮어쓰기 거부를 비교한다. 거부된 새 경로가 정말 없는지, 대조 PNG bytes가 그대로인지 소유자의 읽기로 확인한다. JWT/이미지 본문은 로그에 출력하지 않는다.
+
+실제 삭제 검사/최종 정리는 해당 TEST 파일의 영구 삭제 확인을 받은 뒤에만 진행한다. 다른 계정 remove의 성공 응답만으로 거부를 판정하지 않는다(0행 삭제도 성공할 수 있다). 소유자가 파일을 여전히 읽을 수 있는지 대조하고, 소유자 삭제 후 실제 부재를 확인한다. 원본/버전에서 참조하는 파일은 지우지 않는다.
+
+2026-10-09 삭제 비교/정리 완료: 다른 계정 remove 0개, 소유자 remove 1개, 소유자 목록에서 파일 부재. 일반 download는 캐시 bytes를 반환했으므로 최종 확인에는 아래 기존 SDK 옵션으로 캐시를 우회했다.
+
+```ts
+supabase.storage
+  .from("drawing-files")
+  .download(
+    testPath,
+    { cacheNonce: crypto.randomUUID() },
+    { cache: "no-store" },
+  );
+```
+
+캐시 우회 요청에서 data 없음과 404/NoSuchKey를 확인했다. 서버 삭제가 이미 수신한 bytes나 브라우저 캐시까지 없애지는 않는다. 권한/삭제 여부 검증에 캐시된 성공 응답만 사용하지 않는다. 원본 제목/수정 시각/이미지 보존 및 임시 검사 context 제거도 확인했다. 합성 PNG는 더 이상 남아 있지 않다.

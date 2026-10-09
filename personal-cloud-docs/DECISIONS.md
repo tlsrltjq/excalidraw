@@ -212,8 +212,9 @@
 - 완료 조건: 초안의 element/app state와 참조 BinaryFiles를 하나의 IndexedDB 레코드로 저장한다. 업로드 실패 뒤 재열기에서 이미지까지 복원하고 다시 업로드할 수 있어야 한다. scene이 원격과 같아도 원격에 없는 이미지 bytes가 있으면 복구를 제안한다.
 - 호환성: 기존 `files` 없는 초안을 읽을 수 있도록 optional 필드를 추가한다. 서버 DB migration이나 dependency 추가는 하지 않는다. 다른 문서의 파일을 가져오지 않으며 로컬 데이터는 해당 브라우저 origin에만 남는다.
 - 비동기 규칙: 초안 조회/이미지 다운로드/복원 뒤 drawingId와 generation을 검사한다. 복구 선택까지 autosave를 잠그고, 실패한 로컬 저장은 UI에 알린다. 성공 후 초안 삭제는 해당 snapshot token과 일치할 때만 같은 transaction에서 실행한다.
-- 검증: 실제 IndexedDB 테스트로 bytes 보존/구버전 호환/문서 분리/조건부 삭제를 검사한다. 업로드 실패 후 같은 scene 복구, 재시도, stale 응답, quota 실패, 종료 전 flush를 자동 테스트한다.
+- 검증: 저장소 구현을 mock하지 않고 fake-indexeddb 환경의 IndexedDB API로 bytes 보존/구버전 호환/문서 분리/조건부 삭제를 검사한다. 업로드 실패 후 같은 scene 복구, 재시도, stale 응답, quota 실패, 종료 전 flush를 자동 테스트한다. 실제 Safari 디스크 내구성 검사는 별도다.
 - 한계: 브라우저 강제 종료 전에 끝나지 않은 transaction, 저장소 삭제/eviction, 다른 origin/기기 복구는 보장하지 않는다. 파일을 매 이벤트 복사하지 않고 debounce worker에서 필요한 파일만 보관한다. 전체 drawing backup/export는 다음 작업이다.
+- 2026-10-06 기록 정리: 이미지 포함 현재 그림 백업은 D-015에서 검증했다. Safari 탭 한정 업로드 실패 후 일반 탭 재열기/초안 복구/재업로드는 확인했지만, 이후 URL 새로고침의 빈 캔버스는 미해결이다. 이 관찰만으로 프로세스 강제 종료 내구성이나 데이터 유실을 확정하지 않는다.
 
 ## D-015: 현재 그림의 이미지 포함 백업 검증
 
@@ -222,3 +223,19 @@
 - 완료 조건: Cloud의 database scene과 별도 이미지 bytes를 합친 캔버스를 파일로 저장하고, 빈 편집 상태에서 이미지/element/app state를 복원할 수 있다. SVG에는 이미지 bytes가 포함되고, 편집 데이터 포함 PNG/SVG도 복원 가능해야 한다. 관련 자동 테스트와 Safari 수동 결과를 구분해 기록한다.
 - 위험: database JSON에는 이미지 bytes가 없으므로 단독 백업으로 취급하지 않는다. 선택 영역 export는 전체 백업이 아니며, 파일 다운로드 전 미복원 이미지는 확인해야 한다. 일반 PNG/SVG는 편집 데이터를 포함하지 않으면 scene 복구본이 아니다.
 - 범위 제외: 계정 전체 그림 일괄 export/import, 버전 기록/권한/Cloud ID 보존은 별도 기능이다. 원본 Cloud 그림을 덮어쓰지 않는 새 그림 복원 절차를 운영 문서에 기록한다.
+
+## D-016: Cloud URL 열기와 편집기 초기화 경계
+
+- 상태: 로컬 구현 및 자동/Safari 새로고침 검증 완료 (2026-10-09), Milestone 6
+- 완료 조건: 편집기의 initialData 적용이 끝난 뒤 Cloud URL을 연다. 초기화가 느려도 원격 scene을 빈 local scene으로 교체하지 않는다. 로그인 전환/문서 전환/Strict Mode의 기존 generation 방어를 유지한다.
+- 설계: 공개 API의 getAppState().isLoading과 onChange 구독으로 편집기 준비를 확인한다. Promise resolve만으로 core 초기화 완료를 추정하지 않는다. Cloud 문서가 연결된 탭에는 다른 탭의 전역 LocalData scene/file 동기화를 적용하지 않는다. 익명 local-first 및 기존 공유/협업 흐름은 유지한다.
+- 검증/위험: 실제 Excalidraw와 지연된 initialData를 연결한 회귀 검사, 이미 초기화된 편집기, 계정/문서 전환, Safari 새로고침/이미지 복원을 확인한다. 이 순서 경합은 코드에서 확인 가능한 결함 후보이며 Safari 증상의 유일한 원인이라고 사전에 단정하지 않는다. DB/upstream core/dependency는 변경하지 않는다.
+- 결과: 수정 전 실제 편집기 회귀 테스트에서 최종 element가 빈 배열로 덮이는 실패를 확인했다. 수정 후 초기 인증 상태 두 경우와 Safari 반복 새로고침/새 탭이 정상이다. 전역 LocalData 동기화 차단 및 지연된 로컬 파일의 generation 검사도 추가했다. 서로 다른 local scene의 두 탭/느린 파일 실기기 검사는 별도다.
+
+## D-017: 기능 우선 Workspace와 개인 메뉴
+
+- 결정일: 2026-10-09. 사용자 요청으로 심화 테스트를 보류하고 폴더/검색부터 구현한다.
+- 첫 범위: 한 단계 폴더 CRUD, 그림별 단일 폴더 배치, 미분류와 제목 검색. 중첩 폴더/공유/일괄 작업은 별도다.
+- 데이터: folders와 drawing_folders 관계 테이블을 추가한다. 기존 drawings의 scene/revision/schema를 바꾸지 않아 이전 프론트/PWA와 공존한다. 폴더 삭제는 관계만 cascade하며 그림/이미지는 보존한다.
+- 권한: folders owner RLS, 관계에는 폴더와 그림의 소유권 모두 검사한다. client owner 입력은 사용하지 않는다. migration 미적용 때 기존 그림 목록은 유지하고 폴더 조작은 잠근다.
+- 메뉴: app의 MainMenu 구성에서 사용자 지정 6항목만 제외한다. core, 개인 Cloud 로그인, 내보내기, 협업은 유지한다. 상단 배너/command palette는 이번 메뉴 요청 범위 밖이다.

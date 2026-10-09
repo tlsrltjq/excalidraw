@@ -29,6 +29,11 @@ import {
 } from "../../cloud/drawings";
 import { clearLocalDraft } from "../../cloud/localDraftStore";
 import { cloudSessionAtom } from "../../cloud/session";
+import {
+  loadFolderWorkspace,
+  moveDrawingToFolder,
+  deleteFolder,
+} from "../../cloud/folders";
 
 import { Dashboard, dashboardOpenAtom } from "./Dashboard";
 import { versionHistoryTargetAtom } from "./VersionHistory";
@@ -41,6 +46,13 @@ import type { CloudDrawing } from "../../cloud/types";
 vi.mock("../../cloud/supabaseClient", () => ({
   supabase: null,
   isCloudConfigured: true,
+}));
+vi.mock("../../cloud/folders", () => ({
+  loadFolderWorkspace: vi.fn(),
+  createFolder: vi.fn(),
+  renameFolder: vi.fn(),
+  deleteFolder: vi.fn(),
+  moveDrawingToFolder: vi.fn(),
 }));
 
 vi.mock("../../cloud/drawings", () => ({
@@ -106,6 +118,10 @@ describe("Dashboard Cloud URL loading", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    vi.mocked(loadFolderWorkspace).mockResolvedValue({
+      folders: [{ id: "folder-1", name: "Work" }],
+      assignments: {},
+    });
     vi.mocked(getDrawing).mockResolvedValue(null);
     vi.mocked(listDrawings).mockResolvedValue([]);
     window.history.replaceState({}, "", "/?drawing=drawing-1");
@@ -227,5 +243,69 @@ describe("Dashboard Cloud URL loading", () => {
       drawingId: drawing.id,
       title: drawing.title,
     });
+  });
+
+  it("filters by folder and title, and moves without changing the scene", async () => {
+    window.history.replaceState({}, "", "/");
+    appJotaiStore.set(dashboardOpenAtom, true);
+    vi.mocked(listDrawings).mockResolvedValue([
+      drawing,
+      { ...drawing, id: "drawing-2", title: "Notes" },
+    ]);
+    vi.mocked(loadFolderWorkspace).mockResolvedValue({
+      folders: [{ id: "folder-1", name: "Work" }],
+      assignments: { "drawing-1": "folder-1" },
+    });
+    await renderDashboard();
+    fireEvent.change(screen.getByLabelText("폴더 선택"), {
+      target: { value: "folder-1" },
+    });
+    expect(screen.queryByRole("button", { name: "Notes" })).toBeNull();
+    fireEvent.change(screen.getByLabelText("그림 제목 검색"), {
+      target: { value: "nothing" },
+    });
+    expect(screen.getByText("표시할 그림이 없습니다.")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("그림 제목 검색"), {
+      target: { value: "TEST" },
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("Test drawing 폴더 이동"), {
+        target: { value: "" },
+      });
+    });
+    expect(moveDrawingToFolder).toHaveBeenCalledWith(drawing.id, null);
+    expect(api.updateScene).not.toHaveBeenCalled();
+  });
+
+  it("deletes a folder without deleting drawings", async () => {
+    window.history.replaceState({}, "", "/");
+    appJotaiStore.set(dashboardOpenAtom, true);
+    vi.mocked(listDrawings).mockResolvedValue([drawing]);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    await renderDashboard();
+    fireEvent.change(screen.getByLabelText("폴더 선택"), {
+      target: { value: "folder-1" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("폴더 삭제"));
+    });
+    expect(deleteFolder).toHaveBeenCalledWith("folder-1");
+    expect(screen.getByLabelText("폴더 선택")).toHaveValue("unfiled");
+    expect(api.updateScene).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
+
+  it("keeps drawing access when the folder schema is unavailable", async () => {
+    window.history.replaceState({}, "", "/");
+    appJotaiStore.set(dashboardOpenAtom, true);
+    vi.mocked(listDrawings).mockResolvedValue([drawing]);
+    vi.mocked(loadFolderWorkspace).mockRejectedValue(
+      new Error("schema unavailable"),
+    );
+    await renderDashboard();
+    expect(
+      screen.getByRole("button", { name: drawing.title }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("새 폴더")).toBeDisabled();
   });
 });

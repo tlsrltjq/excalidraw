@@ -111,6 +111,7 @@ import {
   scheduleAutosave,
 } from "./cloud/autosave";
 import { isCloudConfigured } from "./cloud/supabaseClient";
+import { getCurrentDrawing } from "./cloud/currentDrawing";
 import { AppWelcomeScreen } from "./components/AppWelcomeScreen";
 import {
   ExportToExcalidrawPlus,
@@ -543,9 +544,14 @@ const ExcalidrawWrapper = () => {
           });
         } else if (isInitialLoad) {
           if (fileIds.length) {
+            const generation = getCurrentDrawing().generation;
             LocalData.fileStorage
               .getFiles(fileIds)
               .then(async ({ loadedFiles, erroredFiles }) => {
+                const current = getCurrentDrawing();
+                if (current.drawingId || current.generation !== generation) {
+                  return;
+                }
                 if (loadedFiles.length) {
                   excalidrawAPI.addFiles(loadedFiles);
                 }
@@ -610,6 +616,7 @@ const ExcalidrawWrapper = () => {
       }
       if (
         !document.hidden &&
+        !getCurrentDrawing().drawingId &&
         ((collabAPI && !collabAPI.isCollaborating()) || isCollabDisabled)
       ) {
         // don't sync if local state is newer or identical to browser state
@@ -646,9 +653,14 @@ const ExcalidrawWrapper = () => {
               return acc;
             }, [] as FileId[]) || [];
           if (fileIds.length) {
+            const generation = getCurrentDrawing().generation;
             LocalData.fileStorage
               .getFiles(fileIds)
               .then(({ loadedFiles, erroredFiles }) => {
+                const current = getCurrentDrawing();
+                if (current.drawingId || current.generation !== generation) {
+                  return;
+                }
                 if (loadedFiles.length) {
                   excalidrawAPI.addFiles(loadedFiles);
                 }

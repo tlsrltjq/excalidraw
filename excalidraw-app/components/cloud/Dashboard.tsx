@@ -43,10 +43,19 @@ import {
 import { getDrawingIdFromUrl } from "../../cloud/urlDrawingId";
 import { loadCloudDrawingFromUrl } from "../../cloud/urlDrawingLoader";
 
+import {
+  createFolder,
+  deleteFolder,
+  loadFolderWorkspace,
+  moveDrawingToFolder,
+  renameFolder,
+} from "../../cloud/folders";
+
 import "./Dashboard.scss";
 
 import { versionHistoryTargetAtom } from "./VersionHistory";
 
+import type { FolderWorkspace } from "../../cloud/folders";
 import type { CloudDrawingSummary } from "../../cloud/types";
 
 export const dashboardOpenAtom = atom(false);
@@ -73,6 +82,15 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [workspace, setWorkspace] = useState<FolderWorkspace | null>(null);
+  const [folderError, setFolderError] = useState<string | null>(null);
+  const [selectedFolder, setSelectedFolder] = useState("all");
+  const [query, setQuery] = useState("");
+  const [folderBusy, setFolderBusy] = useState(false);
+  const listGeneration = useRef(0);
+  const invalidateList = useCallback(() => {
+    listGeneration.current++;
+  }, []);
 
   const { status, session } = useCloudSession();
   const autoOpenedKeyRef = useRef<string | null>(null);
@@ -81,13 +99,35 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
     promise: ReturnType<typeof getDrawing>;
   } | null>(null);
   const setVersionHistoryTarget = useSetAtom(versionHistoryTargetAtom);
+  const [readyEditor, setReadyEditor] =
+    useState<ExcalidrawImperativeAPI | null>(null);
+
+  useEffect(() => {
+    if (!excalidrawAPI || readyEditor === excalidrawAPI) {
+      return;
+    }
+    // The API exists before initialData has been applied to the editor.
+    if (!excalidrawAPI.getAppState().isLoading) {
+      setReadyEditor(excalidrawAPI);
+      return;
+    }
+    return excalidrawAPI.onChange((_elements, appState) => {
+      if (!appState.isLoading) {
+        setReadyEditor(excalidrawAPI);
+      }
+    });
+  }, [excalidrawAPI, readyEditor]);
 
   // Makes the `?drawing=<uuid>` URL (D-006) meaningful: reloading or
   // sharing the URL reopens the same drawing. Runs once, silently (doesn't
   // open this dialog), as soon as we know the user is signed in and the
   // editor is ready.
   useEffect(() => {
-    if (!excalidrawAPI || status !== "signed-in") {
+    if (
+      !excalidrawAPI ||
+      readyEditor !== excalidrawAPI ||
+      status !== "signed-in"
+    ) {
       return;
     }
     const id = getDrawingIdFromUrl();
@@ -146,29 +186,146 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
     return () => {
       cancelled = true;
     };
-  }, [excalidrawAPI, session?.user.id, setIsOpen, status]);
+  }, [excalidrawAPI, readyEditor, session?.user.id, setIsOpen, status]);
 
   const refresh = useCallback(async () => {
+    const generation = ++listGeneration.current;
+    const userId = session?.user.id;
+    const current = () =>
+      generation === listGeneration.current &&
+      appJotaiStore.get(cloudSessionAtom).session?.user.id === userId;
     setError(null);
+    setFolderError(null);
+    const folderRequest = loadFolderWorkspace()
+      .then((value) => {
+        if (current()) {
+          setWorkspace(value);
+        }
+      })
+      .catch(() => {
+        if (current()) {
+          setWorkspace(null);
+          setSelectedFolder("all");
+          setFolderError(
+            "폴더를 불러오지 못했습니다. 연결 및 폴더 DB 설정을 확인하세요.",
+          );
+        }
+      });
     try {
-      setDrawings(await listDrawings());
+      const result = await listDrawings();
+      if (current()) {
+        setDrawings(result);
+      }
     } catch (e: any) {
-      setError(e?.message ?? String(e));
+      if (current()) {
+        setError(e?.message ?? String(e));
+      }
     }
-  }, []);
+    await folderRequest;
+  }, [session?.user.id]);
 
   useEffect(() => {
     if (isOpen) {
       setDrawings(null);
+      setWorkspace(null);
       refresh();
     }
-  }, [isOpen, refresh]);
+    return invalidateList;
+  }, [isOpen, refresh, invalidateList]);
+
+  useEffect(() => {
+    setSelectedFolder("all");
+    setQuery("");
+  }, [session?.user.id]);
 
   if (!isOpen) {
     return null;
   }
 
   const handleClose = () => setIsOpen(false);
+
+  const handleFolderAction = async (action: "create" | "rename" | "delete") => {
+    if (!workspace) {
+      return;
+    }
+    const folder = workspace.folders.find((item) => item.id === selectedFolder);
+    if (action !== "create" && !folder) {
+      return;
+    }
+    let name: string | null = null;
+    if (action === "delete") {
+      if (
+        !window.confirm(
+          "폴더를 삭제할까요? 그림은 삭제되지 않고 미분류로 이동합니다.",
+        )
+      ) {
+        return;
+      }
+    } else {
+      name = window.prompt("폴더 이름", folder?.name ?? "새 폴더");
+      if (name === null) {
+        return;
+      }
+    }
+    const userId = session?.user.id;
+    setFolderBusy(true);
+    setError(null);
+    try {
+      if (action === "create") {
+        const created = await createFolder(name!);
+        if (appJotaiStore.get(cloudSessionAtom).session?.user.id === userId) {
+          setSelectedFolder(created.id);
+        }
+      } else if (action === "rename") {
+        await renameFolder(folder!.id, name!);
+      } else {
+        await deleteFolder(folder!.id);
+        if (appJotaiStore.get(cloudSessionAtom).session?.user.id === userId) {
+          setSelectedFolder("unfiled");
+        }
+      }
+      if (appJotaiStore.get(cloudSessionAtom).session?.user.id === userId) {
+        await refresh();
+      }
+    } catch {
+      if (appJotaiStore.get(cloudSessionAtom).session?.user.id === userId) {
+        setError("폴더 변경을 저장하지 못했습니다. 다시 시도해 주세요.");
+      }
+    } finally {
+      setFolderBusy(false);
+    }
+  };
+
+  const handleMove = async (drawingId: string, folderId: string) => {
+    const userId = session?.user.id;
+    setBusyId(drawingId);
+    setError(null);
+    try {
+      await moveDrawingToFolder(drawingId, folderId || null);
+      if (appJotaiStore.get(cloudSessionAtom).session?.user.id === userId) {
+        await refresh();
+      }
+    } catch {
+      if (appJotaiStore.get(cloudSessionAtom).session?.user.id === userId) {
+        setError("그림을 이동하지 못했습니다. 다시 시도해 주세요.");
+      }
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const visibleDrawings = drawings?.filter((drawing) => {
+    const folderId = workspace?.assignments[drawing.id];
+    return (
+      (selectedFolder === "all" ||
+        (selectedFolder === "unfiled"
+          ? !folderId
+          : folderId === selectedFolder)) &&
+      drawing.title
+        .toLocaleLowerCase()
+        .includes(query.trim().toLocaleLowerCase())
+    );
+  });
 
   const handleCreate = async () => {
     if (!excalidrawAPI) {
@@ -299,6 +456,76 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
           />
         </div>
 
+        <div className="personal-cloud-dashboard__workspace">
+          <input
+            type="search"
+            aria-label="그림 제목 검색"
+            placeholder="그림 검색"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          <select
+            aria-label="폴더 선택"
+            value={selectedFolder}
+            onChange={(event) => setSelectedFolder(event.target.value)}
+            disabled={!workspace || folderBusy}
+          >
+            <option value="all">전체 그림</option>
+            <option value="unfiled">미분류</option>
+            {workspace?.folders.map((folder) => (
+              <option key={folder.id} value={folder.id}>
+                {folder.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            aria-label="새 폴더"
+            title="새 폴더"
+            className="personal-cloud-dashboard__iconButton"
+            disabled={!workspace || folderBusy}
+            onClick={() => handleFolderAction("create")}
+          >
+            {PlusIcon}
+          </button>
+          <button
+            type="button"
+            aria-label="폴더 이름 변경"
+            title="폴더 이름 변경"
+            className="personal-cloud-dashboard__iconButton"
+            disabled={
+              !workspace ||
+              folderBusy ||
+              ["all", "unfiled"].includes(selectedFolder)
+            }
+            onClick={() => handleFolderAction("rename")}
+          >
+            {pencilIcon}
+          </button>
+          <button
+            type="button"
+            aria-label="폴더 삭제"
+            title="폴더 삭제"
+            className="personal-cloud-dashboard__iconButton"
+            disabled={
+              !workspace ||
+              folderBusy ||
+              ["all", "unfiled"].includes(selectedFolder)
+            }
+            onClick={() => handleFolderAction("delete")}
+          >
+            {TrashIcon}
+          </button>
+        </div>
+        {folderError && (
+          <div className="personal-cloud-dashboard__error" role="alert">
+            {folderError}
+            <button type="button" onClick={refresh}>
+              다시 시도
+            </button>
+          </div>
+        )}
+
         {error && (
           <div className="personal-cloud-dashboard__error" role="alert">
             {error}
@@ -315,15 +542,15 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
           <div className="personal-cloud-dashboard__empty">불러오는 중…</div>
         )}
 
-        {drawings !== null && drawings.length === 0 && (
+        {visibleDrawings && visibleDrawings.length === 0 && (
           <div className="personal-cloud-dashboard__empty">
-            아직 그림이 없습니다. "새 그림 만들기"로 시작하세요.
+            표시할 그림이 없습니다.
           </div>
         )}
 
-        {drawings !== null && drawings.length > 0 && (
+        {visibleDrawings && visibleDrawings.length > 0 && (
           <ul className="personal-cloud-dashboard__list">
-            {drawings.map((drawing) => (
+            {visibleDrawings.map((drawing) => (
               <li key={drawing.id} className="personal-cloud-dashboard__row">
                 {renamingId === drawing.id ? (
                   <TextField
@@ -352,6 +579,23 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
                 <span className="personal-cloud-dashboard__updatedAt">
                   {formatUpdatedAt(drawing.updatedAt)}
                 </span>
+                {workspace && (
+                  <select
+                    aria-label={`${drawing.title} 폴더 이동`}
+                    value={workspace.assignments[drawing.id] ?? ""}
+                    disabled={busyId !== null || folderBusy}
+                    onChange={(event) =>
+                      handleMove(drawing.id, event.target.value)
+                    }
+                  >
+                    <option value="">미분류</option>
+                    {workspace.folders.map((folder) => (
+                      <option key={folder.id} value={folder.id}>
+                        {folder.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
 
                 <button
                   type="button"
