@@ -2,6 +2,15 @@
 
 ## 2026-10-09 통합 및 배포 준비
 
+### 커밋 및 원격 통합 결과
+
+- 제품/회귀 검사/문서/하네스/migration 파일 18개를 `1a246109`로 커밋하고 기능 브랜치를 push했다. 변경 코드 scoped lint(초기화 수정 포함), diff check 및 가드레일도 통과했다.
+- GitHub Vercel status success, Preview deployment `6952461608` success 및 정확한 제품 commit 일치를 확인했다. 미리보기: https://personal-excalidraw-nbgllfvka-spp6.vercel.app . Safari에서는 Vercel 로그인으로 이동해 앱 UI는 확인하지 못했다. 보호 우회나 OAuth 허용 범위 변경은 하지 않았다.
+- 원격 최신 상태를 다시 fetch한 뒤 `personal-cloud`를 `dd1aa82c`에서 `1a246109`로 fast-forward 통합/push했다. 충돌/강제 push/DB 재적용은 없었다. 통합 범위는 30파일이며 이전 기능 커밋들도 포함된다.
+- GitHub Production deployment `6952501950` success 및 Source `1a24610910561c476485fe97b8cfc85033ad0ecf`를 확인했다. 배포 URL은 https://personal-excalidraw-m5q2trk63-spp6.vercel.app 이다. 운영 고정 주소 https://personal-excalidraw.vercel.app/version.json 의 응답도 `2026-10-09T03:45:32Z-1a24610`으로 일치해 고정 도메인 반영을 확인했다.
+- Safari 운영 고정 주소에서 캔버스/도구/메뉴를 확인했다. 요청한 6개 메뉴는 없고 개인 Google 로그인/내보내기/협업/환경 설정은 유지된다. 메뉴 밖 Plus 배너/Welcome Sign up은 D-017 범위 제외대로 남아 있다. 운영 origin은 비로그인 상태이며 로그인 후 내 그림/폴더/저장/이미지 복원은 이번 검사에서 수행하지 않았다. 운영 데이터를 생성/편집/삭제하지 않았다.
+- Vercel Dashboard Ready/Current 표기는 로그인 제약으로 직접 보지 못했으며 GitHub Production success와 실제 고정 도메인 version 응답을 근거로 배포 성공을 판정했다. 로컬 결과를 운영 로그인/저장 완료로 대체하지 않는다. 운영 배포 결과 문서는 기능 브랜치에 별도 커밋하므로 제품 운영 Source는 계속 `1a246109`다.
+
 원격 fetch 결과 통합 기준선 `origin/personal-cloud`의 `dd1aa82c`가 현재 기능 브랜치의 조상임을 확인했다. force push/rebase/DB 재적용 없이 fast-forward 통합 가능한 상태다. 이번 범위에는 기존 URL 오류 안내, 이미지 초안/백업, scene 저장 실패 회귀 검사와 새로고침 수정/Workspace/메뉴 정리가 함께 포함된다. upstream core/dependency 변경은 없다.
 
 커밋 전 관련 자동 검사 3파일 14개와 비로그인 접근 하네스 자체 검사 6개 통과. 직전 동일 제품 코드의 typecheck/build 및 Safari 메뉴/검색 확인 결과를 재사용한다. 전체 suite/심화 장애 검사는 재실행하지 않는다. Vercel Safari 세션은 로그인 화면이므로 기존 프로젝트 계정 로그인을 요청했다. Preview/Production Source 확인 전에는 운영 반영 완료로 기록하지 않는다.

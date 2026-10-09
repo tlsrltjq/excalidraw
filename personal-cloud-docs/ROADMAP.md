@@ -6,10 +6,10 @@
 
 ### 통합 및 배포 계획
 
-- [ ] 현재 기능 브랜치의 새로고침 수정/Workspace/메뉴/검증 기록을 검토하고 커밋한다.
-- [ ] 기능 브랜치를 push하고 Preview 빌드 및 대상 commit을 확인한다.
-- [ ] 원격 personal-cloud 최신 상태를 확인한 뒤 fast-forward 통합/push한다. 강제 push나 DB migration 재실행은 하지 않는다.
-- [ ] 운영 Ready/Current와 Source commit을 확인하고 메뉴/내 그림을 기본 확인한다. 로그인/접근 제약은 미검증으로 기록한다.
+- [x] 현재 기능 브랜치의 새로고침 수정/Workspace/메뉴/검증 기록을 검토하고 커밋한다 (`1a246109`).
+- [x] 기능 브랜치를 push하고 Preview 빌드 성공 및 대상 commit 확인. Safari 화면은 Vercel 로그인 보호로 미확인.
+- [x] 원격 personal-cloud 최신 상태를 확인한 뒤 fast-forward 통합/push. 강제 push나 DB migration 재실행 없음.
+- [x] GitHub Production 배포 success/Source 및 운영 도메인의 version commit 일치, Safari 메뉴 반영 확인. Vercel Dashboard Ready/Current 표기 및 운영 로그인 후 내 그림/저장은 미확인으로 기록한다.
 
 완료 조건: 원격 통합 commit과 실제 배포 Source가 일치해야 운영 반영으로 기록한다. 현재 브랜치의 이전 미통합 기능(이미지 초안/백업/URL 오류 안내)도 포함되므로 마지막 운영 commit과 전체 변경 범위를 확인한다. 심화 장애 검사는 재개하지 않는다.
 
