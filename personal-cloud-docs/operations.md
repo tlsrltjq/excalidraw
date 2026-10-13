@@ -124,6 +124,8 @@ node --test personal-cloud-harness/check-room-relay.node-test.mjs
 
 ## 자체 협업 서버 공개 배포
 
+프론트 전환 준비: `.env.production`의 `VITE_APP_WS_SERVER_URL=https://personal-excalidraw-room.onrender.com`을 빌드에 반영한다. Vercel Production에 동일 이름의 별도 env override가 있으면 저장소 값보다 우선하므로 실제 배포 bundle에서 주소를 확인한다. 롤백 값은 `https://oss-collab.excalidraw.com`이며 변경 뒤 반드시 재빌드한다. 테스트 localhost:3003 허용은 사용자 승인으로만 임시 사용하고 끝나면 제거/Save and deploy한다.
+
 2026-10-13 Free 배포 완료: `https://personal-excalidraw-room.onrender.com`, Source `e2defb1`, Docker/Free/Oregon/자동 배포 Off/`/health`. Render Live와 HTTPS health, 합성 두 클라이언트 relay/재접속/Origin 거부 확인. 운영 Vercel endpoint는 미전환이다. 아래 생성 절차는 재현용이며 같은 서비스를 중복 생성하지 않는다. 기존 '미실행' 설명은 준비 당시 기록이다.
 
 2026-10-13: 서버 `e2defb1`/앱 기록 `c9506cca` 기능 브랜치 push 완료. 사용자는 무료만 허용했다. Render Hobby/카드 미등록/빌드 추가 지출 한도 $0을 읽기 전용으로 확인했다. 카드 추가/유료 플랜은 선택하지 않는다. 무료 사용량 초과 시 중단되는 제약을 수용하고 무제한 무료나 상시 실행으로 안내하지 않는다. 공개 저장소 연결로 GitHub 계정의 추가 저장소 권한은 부여하지 않았다.

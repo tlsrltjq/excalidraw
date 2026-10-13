@@ -251,6 +251,10 @@
 
 ### 공개 배포 준비 (2026-10-09)
 
+### 운영 endpoint 전환 (2026-10-13)
+
+공개 서버를 연결한 localhost:3003 합성 두 브라우저에서 양방향 편집과 새로고침 재참여를 확인했다. root `.env.production`의 기존 공개 `VITE_APP_WS_SERVER_URL` 한 줄만 개인 HTTPS relay로 바꾼다. 별도 중복 env adapter보다 기존 upstream 설정 경로를 유지하는 최소 설정 변경이며 `packages/*`와 Firebase 설정은 건드리지 않는다. 운영 Vercel override 유무/배포 Source/실제 bundle endpoint를 확인하며, 필요하면 이전 공식 URL로 재빌드해 롤백한다. 실제 sleep 뒤 복구는 미검증이고 무료 계정/Origin 제한은 유지한다.
+
 Socket.IO의 새 타입 선언은 TypeScript 4.2에서 파싱되지 않으므로 서버 빌드 도구를 앱과 같은 5.9.3으로 올린다. 기존 dependency 범위 안의 socket.io-adapter도 2.5.8로 갱신해 ws 8.21 계열 보안 수정이 반영되도록 한다. 별도 강제 resolution이나 새 runtime dependency는 추가하지 않는다.
 
 공식 서버는 build/lint 도구까지 dependencies에 넣고 있었다. audit의 전체 경고를 runtime 노출로 단정하지 않고 devDependencies로 분리한다. 기존 Express 4/Socket.IO 4/debug 4의 최신 patch/minor를 registry에서 확인해 업데이트하며 lockfile을 갱신한다. 새 라이브러리는 추가하지 않는다. 컨테이너는 build 단계에 개발 도구를 설치하고 실행 단계에는 production dependencies만 설치한다. 전체 개발 도구 경고가 남으면 수를 기록하고 공개 배포의 runtime 감사와 구분한다. Render Free 설정 초안은 자동 배포를 끄고 작성만 하며 실제 서비스/계정/요금 승인과 운영 endpoint 전환은 별도다.

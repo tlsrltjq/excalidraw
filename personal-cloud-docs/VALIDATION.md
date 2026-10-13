@@ -1,5 +1,13 @@
 # MVP 검증 기록
 
+## 2026-10-13 공개 서버 앱 연결 검증
+
+- 사용자 승인으로 Render 허용 출처에 정확한 `http://localhost:3003`만 임시 추가/Save and deploy. 별도 개발 앱 실행 환경에서 공개 relay를 지정했으며 기존 개발 env 파일은 변경하지 않았다.
+- 기존 Cloud 그림과 분리한 빈 TEST 방에서 Safari/별도 브라우저 양방향 도형/텍스트 전달, 한쪽 새로고침 재참여 뒤 두 요소 복구 확인. 같은 요소 충돌/이미지 협업/모두 퇴장 복원은 검사하지 않았다. room URL/key는 기록하지 않는다.
+- 합성 세션 종료 후 임시 출처 제거 재배포 실행. 협업 회귀 2개, production build, 가드레일 통과. 로컬 bundle 개인 relay 포함/기존 relay 없음 확인.
+- root `.env.production` 공개 relay 주소 한 줄 변경(D-018 운영 전환 기록). core/dependency/Firebase/Supabase는 변경하지 않았다. 전체 테스트/typecheck/lint는 env-only 범위라 반복하지 않았다. 기존 폰트/chunk/Browserslist 빌드 경고는 유지한다.
+- 미검증: 실제 15분 무통신 sleep/cold start 뒤 브라우저 복구, 운영 bundle/Source 반영. 일반 새로고침 재참여를 sleep 검증으로 표기하지 않는다.
+
 ## 2026-10-13 Render Free 공개 배포 결과
 
 - 사용자 승인으로 Free 서비스 생성. 카드 등록/유료 전환 없음. `personal-excalidraw-room.onrender.com`, Docker build/Deploy succeeded/Live, Source `e2defb15e792f7d801efb71dc8410fceeb10e1a9` 확인. Auto-Deploy Off/health `/health` 유지.

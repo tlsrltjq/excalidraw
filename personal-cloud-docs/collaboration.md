@@ -1,5 +1,13 @@
 # 자체 공동편집 서버
 
+## 2026-10-13 공개 서버 앱 연결 계획
+
+- 완료 조건: 공개 relay를 연결한 별도 localhost:3003 테스트 앱에서 합성 TEST 두 브라우저 편집/새로고침 재참여를 확인한다. 운영 endpoint 변경은 해당 검사 후 시행하고 실제 빌드 Source/연결 대상까지 확인한다.
+- 위험/경계: 테스트 전 정확한 임시 Origin 추가 승인을 받고 종료 후 제거한다. wildcard, 결제, DB 변경, 실제 Cloud 그림 사용은 하지 않는다. Firebase persistence/Cloud autosave 잠금은 그대로 유지한다. 15분 sleep 이후 cold start는 실제 대기 검사와 일반 reconnect 결과를 구분한다.
+- 로컬 개발 기본 relay는 유지하고 실행 환경변수만 공개 주소로 덮어쓴다. 테스트 화면이 운영 반영된 것으로 기록하지 않는다. 운영 `.env.production` 및 Vercel 별도 override를 확인한 후 최소 변경한다.
+
+브라우저 결과: Safari/별도 브라우저에서 합성 도형과 텍스트 양방향 전달 및 한쪽 새로고침 뒤 두 요소 복구를 확인했다. 테스트 세션은 종료했고 해당 별도 origin에 합성 결과만 보존했다. 임시 Origin 제거 재배포를 실행했다. 관련 협업 회귀 2개/build/가드레일 통과. 로컬 production bundle에는 개인 relay URL이 있고 이전 공식 relay URL은 없다. 실제 15분 sleep 뒤 복구는 미검증이다. 운영 Git 배포 Source와 공개 bundle 확인은 다음 판정이다.
+
 ## 2026-10-13 커밋 및 공개 배포 준비
 
 - 완료 조건: 검토한 서버 구현/lockfile/배포 초안을 기능 브랜치에 커밋·push하고 원격 commit을 확인한다. 앱 문서/하네스도 별도 기능 브랜치에 보관한다.
