@@ -15,6 +15,8 @@
 
 ## 지금 어디까지 왔나
 
+Milestone 8 후속 (2026-10-13): 사용자 요청으로 새 방은 로그인/게스트 선택 지원으로 설계했다(D-020). `codex/collab-invite-cas`에서 초대 route/proof 처리와 암호화 scene single-flight/CAS worker를 구현·검증했다. 기존 Firebase는 유지하며 새 방 입장 UI/gateway/DB/RLS/Storage/relay ticket은 아직 연결하지 않았다. 다음은 이 서버 측 권한·저장 구현과 선택 화면 연결이다.
+
 Milestone 8 첫 단위 구현 완료 (2026-10-13): `codex/collab-persistence-adapter`에서 저장 계약/Firebase adapter와 controller 연결, 집중 테스트 10개 및 typecheck/lint/build를 완료했다. 현재 Firebase 동작과 운영 배포는 유지한다. 다음은 Supabase room 권한/route/CAS 최종 설계 및 adapter 구현이다. 상세 범위는 collaboration-persistence.md를 따른다.
 
 2026-10-13 최신: 자체 협업 서버 Render Free 배포 및 운영 앱 연결 완료. 서버 `e2defb1`, 운영 앱 Source `d86d9e27`, version `d86d9e2`와 실제 bundle의 개인 relay 주소 확인. 공개 relay를 연결한 localhost:3003 앱에서 Safari/별도 브라우저 양방향 편집·새로고침 재참여 확인. 임시 Origin은 제거하고 실제 차단 검사 통과. 운영 주소의 자동 브라우저 접근은 저장된 접근 설정에 의해 차단돼 운영 화면 검증은 미완료. 실제 sleep 뒤 복구도 남아 있다. 다음 개발은 Milestone 8 협업 저장 독립 설계이며 Milestone 7 잔여 검증을 완료로 지우지 않는다. 카드·유료 플랜은 사용하지 않는다. 아래 날짜별 기록은 당시 상태다.

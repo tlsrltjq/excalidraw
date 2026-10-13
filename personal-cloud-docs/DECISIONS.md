@@ -1,5 +1,13 @@
 # 설계 결정 기록
 
+## D-020: 로그인/게스트 선택과 초대 기반 권한
+
+- 사용자 결정 (2026-10-13): 새 방 입장 시 로그인 참여와 게스트 참여 모두 제공한다. 로그인은 신원 선택이며 두 방식 모두 유효한 초대 권한을 검증한다. room 생성/초대 발급·폐기는 로그인 owner만 한다.
+- 새 Supabase room은 `sc_` namespace를 사용해 기존 20자리 hex Firebase room과 구분한다. 기존 `#room=id,key` 형식은 유지하고 provider/비밀이 아닌 invite UUID만 query로 둔다. 현재 relay는 sc_ 방을 거부하며 새 방은 backend/auth/입장 UI가 준비될 때까지 생성·활성화하지 않는다.
+- roomKey는 클라이언트에만 둔다. Web Crypto HKDF로 room/invite에 종속된 별도 256-bit bearer proof를 파생하고 DB에는 proof의 SHA-256 hash만 저장한다. backend가 만료/폐기/room/scope를 매 작업 검증해야 한다. proof 자체도 비밀이며 로그/URL/fixture에 넣지 않는다. HTTP body/TLS로만 전달한다.
+- 실시간 relay 입장도 새 namespace에서는 검증된 단기 입장 ticket이 필요하다. persistence 권한만으로 실시간 접근을 보호했다고 주장하지 않는다. 게스트 세션은 별도 인증 gateway가 검증하며 anon table CRUD/공개 bucket은 허용하지 않는다. 저장은 브라우저 복호화/reconcile/재암호화와 DB 원자적 CAS로 처리한다.
+- 이번 범위: 순수 초대 route/proof 처리와 암호화 scene single-flight/CAS 저장 worker 및 테스트. DB/RLS/gateway/선택 UI/새 provider 연결은 후속이며 현재 Firebase/운영은 유지한다.
+
 ## D-019: 협업 persistence 계약과 Firebase 호환 adapter
 
 - 결정일: 2026-10-13, Milestone 8 첫 단위. 기존 다섯 persistence 함수를 명시적 계약과 기본 Firebase adapter로 묶고 Collab 호출부만 연결한다.

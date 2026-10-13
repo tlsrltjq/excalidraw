@@ -775,12 +775,14 @@ D-012 결정에 따라 구현했다 (구글 시트/문서 버전 기록을 단�
 
 ## Milestone 8: 공동편집 Persistence 독립
 
+2026-10-13 후속: 로그인/게스트 선택 지원으로 결정(D-020). client invite route/proof/hash와 암호화 scene CAS/single-flight worker 구현. 실제 gateway/DB/RLS/Storage/입장 UI/relay auth는 미연결이며 전체 단계는 진행 중이다.
+
 - [x] `CollabPersistence` interface 설계 및 controller 연결 (2026-10-13)
 - [x] 기존 Firebase adapter 작성, 집중 테스트 10개/typecheck/lint/build 통과
 - [ ] Supabase adapter 작성
 - [ ] client-side encryption 유지
 - [ ] encrypted scene/file 저장
-- [ ] room URL key와 로그인 권한의 관계 결정
+- [x] room URL key와 로그인 권한의 관계 결정 (D-020, 로그인/게스트 모두 초대 권한 검증; 서버 적용은 미완료)
 - [ ] room 복구 및 동시 저장 테스트
 
 완료 조건: Socket transport와 persistence 모두 개인 인프라를 사용한다.

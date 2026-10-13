@@ -1,5 +1,14 @@
 # MVP 검증 기록
 
+## 2026-10-13 초대 proof 및 암호화 CAS 기반
+
+- 변경: `collab/persistence/invites.ts`/test, `sceneWriter.ts`/test와 관련 docs. 기존 Firebase adapter/controller, packages, 운영 env/DB/Storage/relay는 변경하지 않았다. 새 코드의 운영 입장 경로는 아직 연결하지 않는다.
+- 사용자 선택은 로그인/게스트 모두 지원(D-020). 새 sc_ room의 invite UUID/provider는 query, key는 기존 room hash에 유지한다. Web Crypto HKDF proof는 room/invite/key에 종속되고 SHA-256 hash 저장 계약이다. 실제 backend expiry/revoke/scope 검증은 미구현이다.
+- 집중 검사 35개: invite route/proof 14, CAS worker 11, 기존 adapter 8/협업 2. Node Web Crypto의 실제 HKDF/AES-GCM과 upstream restore/reconcile를 사용한다. synthetic scene/key만 사용했고 실제 사용자 데이터는 없다.
+- CAS store는 in-memory atomic mock이다. 두 독립 writer race/재조회 병합, room별 single-flight와 다른 room 진행, 삭제 요소 보존, 3회 충돌 후 중단, stale read/write 결과, offline 후 queue 복구, 다른 key/malformed ciphertext/잘못된 revision 거부를 검사했다. Supabase 원자성/RLS/실서비스 검증을 대체하지 않는다. 테스트에서는 upstream updated timestamp가 1로 고정돼 Date.now도 맞춰 삭제 유예 조건을 검사했다.
+- 검증: typecheck/전체 code lint/build 통과 후 추가 입력/응답 검사를 포함한 최종 집중 test/typecheck/scoped lint 재확인. guardrails/diff/scoped formatting 검사. 기존 Firebase config 미설정 테스트 경고/MetaProperty lint 진단 및 font/chunk/Browserslist 경고는 유지한다.
+- 생략: 전체 앱 테스트/실기기 입장 화면/서버 만료·폐기/DB RLS/Storage/relay ticket/sleep. 입력 해석은 권한 검증이 아니고 로그인/게스트 선택값도 권한으로 신뢰하지 않는다. 이미 전송된 서버 write는 취소되지 않을 수 있지만 stale 결과를 editor에 적용하지 않는다. 기능 전환/유료 옵션/DB 변경은 하지 않았다.
+
 ## 2026-10-13 Milestone 8 Firebase adapter 첫 단위
 
 - 변경 파일: `excalidraw-app/collab/Collab.tsx`의 다섯 persistence 호출, `collab/persistence/types.ts`, `firebase.ts`, `index.ts`, `firebase.test.ts`, 관련 개인 문서. `data/firebase.ts`/core/DB/dependency/env/운영 배포는 변경하지 않았다.
