@@ -239,3 +239,18 @@
 - 데이터: folders와 drawing_folders 관계 테이블을 추가한다. 기존 drawings의 scene/revision/schema를 바꾸지 않아 이전 프론트/PWA와 공존한다. 폴더 삭제는 관계만 cascade하며 그림/이미지는 보존한다.
 - 권한: folders owner RLS, 관계에는 폴더와 그림의 소유권 모두 검사한다. client owner 입력은 사용하지 않는다. migration 미적용 때 기존 그림 목록은 유지하고 폴더 조작은 잠근다.
 - 메뉴: app의 MainMenu 구성에서 사용자 지정 6항목만 제외한다. core, 개인 Cloud 로그인, 내보내기, 협업은 유지한다. 상단 배너/command palette는 이번 메뉴 요청 범위 밖이다.
+
+## D-018: 자체 협업 transport의 독립 저장소
+
+- 결정일: 2026-10-09, Milestone 7 착수.
+- 공식 excalidraw-room을 별도 개인 저장소로 fork/clone하고 upstream을 등록한다. 검증된 Socket.IO relay를 사용하며 이 앱의 packages와 dependency는 수정하지 않는다. 서버 전용 dependency는 공식 서버의 lockfile을 따른다.
+- 로컬 서버는 앱의 기존 개발 endpoint인 localhost:3002에 연결한다. 로컬 실행은 loopback만 허용하고 공개 배포는 별도로 진행한다.
+- transport는 암호화된 bytes를 전달하며 room key/평문 scene은 서버에 저장하거나 로그로 남기지 않는다. join/broadcast room membership 검사를 서버 코드에서 확인한다. 링크를 가진 참여자 모델과 계정별 Cloud RLS는 별개다.
+- Firebase scene/file persistence와 기존 autosave 협업 잠금은 유지한다. Supabase 협업 persistence, 공개 호스팅/계정 생성/유료 플랜은 이번 로컬 구현 범위에서 제외한다.
+- 완료 조건: 두 실제 Socket.IO 클라이언트의 join/암호문 전달/다른 room 격리/재접속과 기존 앱 협업 회귀 검사를 통과하고 재기동 가이드를 남긴다. 실제 브라우저 동시 편집/공개 endpoint 전환은 별도 결과로 기록한다.
+
+### 공개 배포 준비 (2026-10-09)
+
+Socket.IO의 새 타입 선언은 TypeScript 4.2에서 파싱되지 않으므로 서버 빌드 도구를 앱과 같은 5.9.3으로 올린다. 기존 dependency 범위 안의 socket.io-adapter도 2.5.8로 갱신해 ws 8.21 계열 보안 수정이 반영되도록 한다. 별도 강제 resolution이나 새 runtime dependency는 추가하지 않는다.
+
+공식 서버는 build/lint 도구까지 dependencies에 넣고 있었다. audit의 전체 경고를 runtime 노출로 단정하지 않고 devDependencies로 분리한다. 기존 Express 4/Socket.IO 4/debug 4의 최신 patch/minor를 registry에서 확인해 업데이트하며 lockfile을 갱신한다. 새 라이브러리는 추가하지 않는다. 컨테이너는 build 단계에 개발 도구를 설치하고 실행 단계에는 production dependencies만 설치한다. 전체 개발 도구 경고가 남으면 수를 기록하고 공개 배포의 runtime 감사와 구분한다. Render Free 설정 초안은 자동 배포를 끄고 작성만 하며 실제 서비스/계정/요금 승인과 운영 endpoint 전환은 별도다.

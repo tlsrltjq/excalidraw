@@ -1,5 +1,35 @@
 # MVP 검증 기록
 
+## 2026-10-13 서버 커밋/push 및 배포 준비 재개
+
+- 서버 build(typecheck)/lint, 실행 dependency audit 0건, 실제 relay 하네스 7개, app guardrails 7 changed files 재확인. 서버 `e2defb1` 커밋/push 및 원격 전체 SHA 일치 확인.
+- Docker daemon은 여전히 연결되지 않아 container build는 생략했다. 앱 제품 코드가 바뀌지 않아 전체 앱 검증과 지난 Safari 편집 검사를 반복하지 않았다.
+- 서버 기능 브랜치의 GitHub Actions 실행 목록은 조회 당시 비어 있었다. 로컬 검증을 CI 성공으로 기록하지 않는다. master 전용 upstream Docker publish는 실행하지 않았다.
+- 사용자 로그인 후 Safari Render 대시보드 확인. 공개 서비스 생성/운영 endpoint 전환은 아직 하지 않았다.
+
+## 2026-10-09 자체 협업 서버 후속 검증/배포 준비
+
+- 변경: 별도 서버 package.json/yarn.lock의 기존 dependency 업데이트와 실행/개발 분리, 다단계 Dockerfile, Render 설정 초안. 앱 코드/DB/운영 URL은 변경하지 않았다. 앱 문서와 relay 하네스는 이전 로컬 구현 변경을 유지한다.
+- Safari와 별도 in-app 브라우저의 합성 TEST 방에서 도형/텍스트 양방향 전달, 각자의 undo/redo가 상대 요소를 보존함을 확인했다. 기존 Cloud 그림은 사용하지 않았다. room 링크/key는 기록하지 않는다.
+- 서버 재기동 뒤 두 참여자가 재연결되고 상대 편집이 전달됐다. 직후 Safari의 빈 화면은 상대가 새 도형을 편집한 뒤 기존 요소와 함께 복구됐다. 이를 무편집 즉시 복구 성공이나 서버 데이터 유실로 단정하지 않는다.
+- 업데이트 후 실행용 audit: 0건. 전체 개발 graph: 101 advisory paths (low 5/moderate 29/high 66/critical 1). 경로 수는 고유 취약점 수가 아니다. 남은 개발 도구 경고는 runtime 감사와 분리하며 production container에는 설치하지 않는다.
+- 서버 frozen install/build(typecheck)/lint, 실제 relay 하네스 7개, 앱 협업 회귀 2개, 가드레일(7 changed files) 통과. Render YAML 파싱/주요 설정 검사 통과. 임시 TEST 브라우저 탭은 닫고 기존 탭은 보존했다.
+- 생략: Docker daemon 연결 불가로 실제 image build, 공개 호스팅/운영 전환, 같은 요소 충돌 편집, 전원 종료/모두 퇴장 후 Firebase 복원, 협업 이미지 저장. 앱 제품 코드가 없어 전체 앱 typecheck/lint/build/전체 테스트는 반복하지 않고 관련 검사만 실행한다.
+- 다음: 서버 변경 검토/커밋/push, Render 계정/플랜/공개 접근 확인 후 외부 배포. 운영 URL 변경은 공개 health/브라우저 확인 이후 별도 시행한다. 심화 안정화는 보류 유지한다.
+
+## 2026-10-09 자체 협업 서버 로컬 구현
+
+Milestone 7 / D-018. 앱 branch `codex/personal-collaboration-server`, 별도 서버 branch `codex/personal-room-server`. 공식 excalidraw-room 기준 `03ff435860b508d7cd9e005cfc90f7977ae2a593`를 개인 Fork/Clone하고 origin/upstream을 확인했다. 새 서버 Fork는 공개 upstream 코드 기반이며 이번 로컬 수정은 아직 커밋/push하지 않았다. 앱 제품 코드/운영 endpoint/DB/로그인/기존 그림은 변경하지 않았다.
+
+- 서버: `src/index.ts`에 HOST/PORT, health, 정확한 Origin allowlist 및 WebSocket handshake 검사, 현재 앱 형식의 room ID/단일 canvas 방 검증, broadcast membership/binary/IV 검사, 동일 방 follow 제한, graceful shutdown 추가. key/scene plaintext는 서버에서 처리하지 않는다.
+- 서버: `package.json`의 로컬 실행 명령, Node 24/frozen install Dockerfile, `.dockerignore`, `PERSONAL.md`, `AGENTS.md` 추가/수정. 기존 lockfile 설치를 완료했고 새 dependency/lockfile 변경은 없다.
+- 앱: `check-room-relay.node-test.mjs`, collaboration 설계 및 운영/로드맵/결정/결과 문서 추가. mock Socket이 아닌 실제 Socket.IO 클라이언트로 합성 AES-GCM bytes를 전달한다. 자기 방 relay/decrypt 일치, 다른 방 reliable/volatile 주입 차단, 비참여자/잘못된 binary/IV 차단, 같은 방 follow 유지/다른 방 차단, socket 재접속 후 relay, polling 허용/외부 Origin WebSocket 거부 확인. negative delivery 판정은 로컬 250ms 관찰 범위다.
+- 기존 앱 협업 회귀 2개 통과. Node relay 하네스 parent 포함 7개 통과. 서버 `yarn build`, `yarn test:code`, 변경 하네스 scoped lint 통과. 마지막 shutdown/config 수정 후 서버를 중지/재기동하고 같은 하네스를 다시 실행했다.
+- relay는 127.0.0.1:3002에서 계속 실행하며 app은 기존 3001을 유지한다. 개발 앱 endpoint는 이미 localhost:3002였으므로 프론트 변경/재빌드는 필요 없다. 서버에는 실제 사용자 데이터 저장소가 없다.
+- 최종 가드레일 7개 app 변경 파일, 양쪽 저장소 diff check 및 변경 문서/코드 scoped formatting 통과. 서버 소스는 별도 저장소의 build/lint로 검사하며 app 가드레일의 스캔 범위에 포함된 것으로 표기하지 않는다.
+
+생략/남은 위험: 두 브라우저의 실제 동시 scene 편집/undo/이미지/재연결, Docker build, 공개 host/TLS/sleep, dependency 보안 검토/업데이트, rate limiting. Origin은 Node client가 위조할 수 있어 계정 인증으로 간주하지 않는다. Firebase persistence 독립은 Milestone 8이며 아직 변경하지 않았다. 앱 코드 변경이 없어 전체 app typecheck/lint/tests/build는 재실행하지 않는다. 공개 배포/운영 endpoint 전환과 Milestone 7 전체 완료는 아니다.
+
 ## 2026-10-09 통합 및 배포 준비
 
 ### 커밋 및 원격 통합 결과

@@ -88,6 +88,52 @@ node --env-file=.env.local personal-cloud-harness/check-anonymous-access.mjs dtp
 
 응답 본문, scene, key, 인증 토큰은 출력하지 않는다. 비로그인 읽기만 검사하므로 다른 로그인 계정의 그림/파일 접근, Storage 경로 및 쓰기/삭제 권한 검사는 별도로 진행해야 한다.
 
+## 로컬 협업 서버 실행과 재기동
+
+앱 서버(3001)와 협업 relay(3002)는 별도 프로세스다. 협업 relay에는 DB가 없으며 중지/재기동 때문에 Supabase/Firebase를 초기화하지 않는다. 공식 upstream 기준은 `03ff4358`, 개인 서버 저장소는 https://github.com/tlsrltjq/excalidraw-room 이다.
+
+처음 실행할 때:
+
+```bash
+cd /Users/shingiseop/workspace/personal/excalidraw-room
+yarn install --frozen-lockfile
+yarn start:local
+```
+
+`start:local`은 빌드한 뒤 127.0.0.1:3002에 실행한다. 이 터미널을 유지한다. 별도 터미널에서 위의 앱 시작 절차를 따라 3001을 실행한다. 상태 확인:
+
+```bash
+curl --fail http://127.0.0.1:3002/health
+lsof -nP -iTCP:3002 -sTCP:LISTEN
+```
+
+health는 `{"status":"ok"}`를 반환한다. 화면에 별도 ready 로그가 없어도 health로 판단한다. 서버 터미널에서 Ctrl+C로 종료하고 같은 `yarn start:local`을 실행하면 재기동된다. 포트 충돌 시 lsof로 해당 저장소의 프로세스인지 확인한 뒤 그 터미널을 종료한다. 다른 Node 프로세스를 일괄 종료하지 않는다.
+
+허용 출처 기본값은 `http://127.0.0.1:3001,http://localhost:3001`이다. 다른 앱 포트를 사용한다면 서버 실행 환경에 정확한 Origin을 설정하고 재기동한다. wildcard나 URL path를 넣지 않는다. 기존 앱 개발 환경은 `http://localhost:3002`로 연결하며 운영 앱은 아직 공식 협업 서버를 사용한다.
+
+로컬 relay 확인은 앱 저장소에서 실행한다:
+
+```bash
+cd /Users/shingiseop/workspace/personal/excalidraw
+node --test personal-cloud-harness/check-room-relay.node-test.mjs
+```
+
+하네스는 합성 데이터만 전송하고 접속을 모두 종료한다. 로컬 HTTP loopback 주소만 허용한다. 실패 시 앱/서버 포트와 Origin 설정을 확인하며 보호 설정을 끄지 않는다. Firebase/계정/기존 Cloud 그림을 변경하는 검사는 아니다.
+
+공개 배포는 별도 단계다. Node 24 Dockerfile은 준비했지만 컨테이너 실행은 미검증이다. 기존 서버 dependency 점검, TLS를 지원하는 지속 실행 WebSocket host, 정확한 운영 Origin, HOST/PORT 및 health 설정, 남용 제한을 먼저 준비한다. 컨테이너는 내부에서 0.0.0.0에 바인딩하므로 검토 없이 포트를 외부 공개하지 않는다. Vercel 프론트 배포만으로 room 서버가 생성되지 않는다. 실제 공개 서버 URL이 준비된 후에만 Vercel의 `VITE_APP_WS_SERVER_URL`을 바꾸고 새 빌드를 실행한다.
+
+## 자체 협업 서버 공개 배포 (아직 미실행)
+
+1. 별도 서버 저장소 변경을 검토/커밋/push한다. `render.yaml`의 branch가 실제 원격 branch와 일치해야 한다. 로컬 초안만으로 원격 서비스에 코드가 반영되지는 않는다.
+2. Render 계정 로그인 후 Blueprint 또는 Docker Web Service로 개인 `excalidraw-room` 저장소를 연결한다. 서비스 생성 전에 Free 플랜, 결제/한도, 공개 접근을 확인한다. 자동 배포는 off로 두고 첫 배포를 수동 실행한다.
+3. HOST `0.0.0.0`, PORT `10000`, NODE_ENV `production`, CORS_ORIGIN `https://personal-excalidraw.vercel.app`, health path `/health`를 설정한다. Preview는 검증한 정확한 Origin만 추가하고 wildcard를 쓰지 않는다.
+4. 빌드/health와 HTTPS 주소, 공개 서버의 두 브라우저 편집/재연결을 확인한 뒤에만 Vercel Production의 `VITE_APP_WS_SERVER_URL`을 실제 서버 HTTPS URL로 변경하고 프론트를 재배포한다.
+5. 장애 시 Vercel 환경변수를 이전 정상 공식 서버 주소로 복원하고 재배포한다. 서버 재배포/재시작은 연결을 끊을 수 있으므로 작업을 먼저 파일로 백업한다. DB reset이나 Storage 삭제는 필요 없다.
+
+Render Free는 유휴 상태에서 sleep하고 다음 요청의 cold start 지연이 있을 수 있다. workspace 시간/대역폭 한도와 결제 설정을 확인한다. 상시 협업을 보장하는 구성으로 간주하지 않는다. [Free 제한](https://render.com/docs/free), [WebSocket](https://render.com/docs/websocket), [Blueprint 설정](https://render.com/docs/blueprint-spec).
+
+현재 서비스 생성/운영 endpoint 전환은 하지 않았다. Docker daemon 연결 불가로 Docker build는 미검증이다. 재기동 직후 Safari 빈 화면은 상대 편집 이후 복구됐으나 무편집 즉시 복구는 후속으로 남긴다. room 링크/key는 기록하지 않는다.
+
 ## DB migration 운영
 
 2026-10-09: `20261009040000_create_workspace_folders.sql`을 기존 프로젝트 SQL Editor에서 적용했다. `folders`, `drawing_folders` 두 테이블을 추가하며 기존 그림 schema/파일은 변경하지 않는다. 적용 전 두 테이블 부재, 적용 성공, authenticated 역할/claims 기반 rollback 검사 6항목 통과를 확인했다. 이미 적용했으므로 이 SQL을 다시 실행하지 않는다. CLI migration 이력 정합성은 아직 별도 작업이다.

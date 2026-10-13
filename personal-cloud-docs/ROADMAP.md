@@ -2,6 +2,8 @@
 
 ## 2026-10-09 현재 상태
 
+Milestone 7 후속: Safari/별도 브라우저 양방향 편집 및 자신의 undo/redo, 서버 재기동 후 편집 재전달 확인. 실행 dependency audit 0건, 다단계 Docker/Render 수동 배포 초안 준비. 공개 서버/운영 전환은 미완료. 재연결 직후 무편집 상태의 일시적 빈 화면 및 개발 도구 경고는 후속으로 유지한다.
+
 사용자 요청으로 심화 안정화 검증은 보류하고 기능 우선으로 전환한다. 미검증 항목은 삭제하지 않으며 Milestone 6 전체 완료로 표시하지 않는다.
 
 ### 통합 및 배포 계획
@@ -21,7 +23,7 @@
 - [x] 메뉴의 Excalidraw+/Socials/Sign up/Visual Debug만 숨기고 개인 로그인/내 그림/내보내기/협업 유지
 - [x] 기본 typecheck/scoped lint/관련 테스트/build 및 Safari 메뉴/목록/검색 화면 확인. 심화 장애 검사는 후속으로 보류
 
-Milestone 0~5 기반 구현 완료, Milestone 6 안정화 진행 중이다. 아래 날짜별 기록은 당시 상태이며 최신 판정은 이 요약과 VALIDATION의 최신 항목을 따른다. 새로고침 초기화 경합은 로컬 수정/검증 완료했으며 운영 배포는 별도다.
+Milestone 0~5 기반 구현 완료, Milestone 6 심화 안정화 검증 보류, Milestone 7 로컬 서버 구현 완료/공개 배포 준비 단계다. 아래 날짜별 기록은 당시 상태이며 최신 판정은 이 요약과 VALIDATION의 최신 항목을 따른다. 새로고침 초기화 경합/Workspace 수정은 운영 배포했고 자체 협업 서버는 아직 운영 전환하지 않았다.
 
 - 완료: 로그인/내 그림/자동 저장/이미지, 버전 복원, 현재 그림 파일 백업, Safari 탭 한정 업로드 실패 후 초안 복구와 재업로드
 - 후속 수정 완료: URL 새로고침의 빈 캔버스 (D-016, 실제 편집기 회귀 검사 및 2026-10-09 Safari 반복 새로고침/새 탭 이미지 확인)
@@ -29,7 +31,7 @@ Milestone 0~5 기반 구현 완료, Milestone 6 안정화 진행 중이다. 아�
 - 후속 접근 검증 완료: 실제 두 계정의 같은 TEST 파일 Storage HTTP 다운로드 비교/다른 계정 metadata 0행
 - 후속 쓰기 검증 완료: DB metadata CRUD/owner/parent 검사, 실제 두 계정 Storage 생성/덮어쓰기/삭제 격리 및 합성 TEST PNG 정리
 - 남은 검증: 실제 JWT metadata 쓰기/서명 URL, 프로세스 강제 종료/eviction 및 미완료 transaction의 한계 확인, 서로 다른 local scene 두 탭/느린 로컬 파일 응답
-- 후속 기능: 폴더/검색 Workspace는 로컬 구현. 검토/통합/배포 후 Milestone 7~11의 자체 협업/AI/Local LLM/MCP로 진행한다.
+- 후속 기능: 폴더/검색 Workspace 운영 반영. Milestone 7 로컬 서버 구현 후 공개 호스팅/브라우저 확인을 진행하고 Milestone 8~11의 협업 persistence/AI/Local LLM/MCP로 이어간다.
 - 종료 기준: 새로고침 문제를 수정·재검증하고 미검증 범위를 명시한 뒤 Milestone 6 종료 여부를 판정한다. 모든 테스트 완료 또는 최신 코드 운영 배포로 표시하지 않는다.
 
 ### 2026-10-09 URL 오류 및 권한 후속 검증 계획
@@ -754,14 +756,16 @@ D-012 결정에 따라 구현했다 (구글 시트/문서 버전 기록을 단�
 
 ## Milestone 7: 자체 공동편집 서버
 
-- [ ] 기존 공동편집 회귀 테스트
-- [ ] `excalidraw-room` Fork/Clone/upstream 등록
-- [ ] 로컬 Socket.IO 서버 테스트
+- [x] 기존 공동편집 회귀 테스트 2개 통과. 두 브라우저 동시 편집은 별도다.
+- [x] `excalidraw-room` Fork/Clone/upstream 등록 (`03ff4358` 기준)
+- [x] 로컬 Socket.IO 서버 구현/실행, 실제 client relay/격리/재접속 하네스 7개 통과
 - [ ] Render 등 WebSocket host에 배포
 - [ ] 배포 앱의 WebSocket endpoint 변경
 - [ ] sleep 후 재연결 UX 확인
 
 이 단계에서도 공식 Firebase persistence는 먼저 유지한다.
+
+2026-10-09: 로컬 단계 완료. 구현/위험은 `collaboration.md`, 서버 재기동은 `operations.md` 참고. 공개 호스팅/운영 endpoint 전환/실제 브라우저 동시 편집은 아직 완료하지 않았다.
 
 완료 조건: 실시간 transport가 자체 room server를 사용한다.
 
