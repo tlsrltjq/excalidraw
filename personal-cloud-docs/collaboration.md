@@ -1,5 +1,7 @@
 # 자체 공동편집 서버
 
+최신 판정: 2026-10-13 운영 프론트 Source `d86d9e27`로 개인 relay 연결 완료. local/production build와 공개 endpoint 반영 확인. 운영 화면 자동 접근과 실제 sleep 뒤 브라우저 복구는 미검증이다. 아래 준비 당시 '미전환' 기록은 이 결과로 후속 처리한다.
+
 ## 2026-10-13 공개 서버 앱 연결 계획
 
 - 완료 조건: 공개 relay를 연결한 별도 localhost:3003 테스트 앱에서 합성 TEST 두 브라우저 편집/새로고침 재참여를 확인한다. 운영 endpoint 변경은 해당 검사 후 시행하고 실제 빌드 Source/연결 대상까지 확인한다.
@@ -7,6 +9,8 @@
 - 로컬 개발 기본 relay는 유지하고 실행 환경변수만 공개 주소로 덮어쓴다. 테스트 화면이 운영 반영된 것으로 기록하지 않는다. 운영 `.env.production` 및 Vercel 별도 override를 확인한 후 최소 변경한다.
 
 브라우저 결과: Safari/별도 브라우저에서 합성 도형과 텍스트 양방향 전달 및 한쪽 새로고침 뒤 두 요소 복구를 확인했다. 테스트 세션은 종료했고 해당 별도 origin에 합성 결과만 보존했다. 임시 Origin 제거 재배포를 실행했다. 관련 협업 회귀 2개/build/가드레일 통과. 로컬 production bundle에는 개인 relay URL이 있고 이전 공식 relay URL은 없다. 실제 15분 sleep 뒤 복구는 미검증이다. 운영 Git 배포 Source와 공개 bundle 확인은 다음 판정이다.
+
+운영 결과: Preview success 후 personal-cloud를 fast-forward/push했다. GitHub Production deployment Source `d86d9e270b0933db969e008d487ac05e960280b7`, 운영 version `2026-10-13T12:37:31Z-d86d9e2`, 실제 module bundle에 개인 relay 포함/공식 relay 없음 확인. 이후 운영 자동 브라우저 접근이 사용자 저장 설정으로 거부돼 다른 표면으로 우회하지 않았다. 테스트 Origin 제거 중 입력 값에 잔여 문자가 남아 한 번 시작 검증이 실패했으나 정확한 문자열 교체 뒤 Render Live 확인, 운영 Origin 접속 positive control 및 localhost:3003 거부 확인으로 해결했다.
 
 ## 2026-10-13 커밋 및 공개 배포 준비
 

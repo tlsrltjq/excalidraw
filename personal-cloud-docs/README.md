@@ -14,7 +14,7 @@
 
 ## 지금 어디까지 왔나
 
-2026-10-13 최신: 자체 협업 서버 Render Free 배포/Live/HTTPS health/합성 relay·재접속·Origin 검사 완료. 주소 `https://personal-excalidraw-room.onrender.com`. 서버 `e2defb1`, 운영 프론트 연결은 아직 미전환. 다음은 공개 서버 연결 프론트/브라우저 확인 후 endpoint 전환이다. 카드·유료 플랜은 사용하지 않는다. 아래 2026-10-09 기록은 당시 상태다.
+2026-10-13 최신: 자체 협업 서버 Render Free 배포 및 운영 앱 연결 완료. 서버 `e2defb1`, 운영 앱 Source `d86d9e27`, version `d86d9e2`와 실제 bundle의 개인 relay 주소 확인. 공개 relay를 연결한 localhost:3003 앱에서 Safari/별도 브라우저 양방향 편집·새로고침 재참여 확인. 임시 Origin은 제거하고 실제 차단 검사 통과. 운영 주소의 자동 브라우저 접근은 저장된 접근 설정에 의해 차단돼 운영 화면 검증은 미완료. 실제 sleep 뒤 복구도 남아 있다. 다음 개발은 Milestone 8 협업 저장 독립 설계이며 Milestone 7 잔여 검증을 완료로 지우지 않는다. 카드·유료 플랜은 사용하지 않는다. 아래 날짜별 기록은 당시 상태다.
 
 2026-10-09 기준, Milestone 0~5의 기반 기능은 구현됐고 **Milestone 6: MVP 안정화는 심화 검증 보류**다. 새로고침 수정/폴더/검색/메뉴 변경을 운영 배포했다. Safari 운영 메뉴 반영은 확인했고 운영 로그인 후 폴더/저장/이미지 복원 확인은 남아 있다. 다음 기능 개발은 Milestone 7 자체 공동편집 서버다.
 
@@ -40,12 +40,12 @@ Safari 재개 검사에서는 저장된 복원본 재열기, 없는 ID 경고 �
 
 ## 다음 시작 순서
 
-2026-10-13 후속: 서버 `e2defb1`을 `origin/codex/personal-room-server`에 커밋/push하고 원격 SHA를 확인했다. 서버 build/lint와 relay 7개, runtime audit 0건 재확인. Safari Render 로그인 후 공개 저장소 연결 설정을 준비 중이며 실제 서비스/운영 endpoint는 아직 변경하지 않았다. 재연결 직후 일시적인 빈 캔버스와 개발 도구 경고는 남아 있다.
+2026-10-13 후속: 서버 배포/운영 프론트 연결 완료. 최신 검증은 VALIDATION의 공개 서버 앱 연결 결과를 따른다. 운영 화면과 실제 cold start 확인은 남아 있고, 개발 도구 경고는 runtime audit과 구분한다.
 
 1. operations의 시작 절차로 기존 origin `http://127.0.0.1:3001/`을 사용한다. 로컬 앱도 운영 Supabase를 사용하므로 TEST 그림만 조작한다.
 2. VALIDATION의 2026-10-09 통합/운영 배포 및 초기화 경합 수정 기록을 확인한다. 제품 코드는 운영 반영했고 로그인 후 운영 기능 확인은 남아 있다.
 3. 사용자 요청으로 심화 검사는 보류하고 기능 개발을 우선한다(D-017). 폴더/검색과 메뉴 정리는 로컬 구현했으며 최신 결과는 VALIDATION을 따른다. 보류한 검사는 Milestone 6의 남은 항목으로 유지한다.
-4. 다음은 Milestone 7 서버 변경 검토/커밋/push와 Render 계정/플랜 확인 후 공개 배포다. 공개 서버 검증 뒤 운영 endpoint를 전환한다. 이후 협업 persistence 독립, AI Gateway, Local LLM, MCP 순서다. 기능 우선 전환이 Milestone 6 전체 완료를 의미하지 않는다.
+4. Milestone 7 운영 연결은 완료했다. 운영 화면/실제 sleep 복구는 남긴 채 다음 개발은 Milestone 8 협업 persistence 독립 설계, 이후 AI Gateway, Local LLM, MCP 순서다. 기능 우선 전환이 Milestone 6 전체 완료를 의미하지 않는다.
 
 테스트 그림 두 개와 기존 백업은 보존한다. 2026-10-09 Safari 캔버스 변경은 없었고 SQL 쓰기는 rollback했다. Storage 권한 비교용 합성 PNG 한 개는 사용자 승인 후 영구 삭제했다. 원본 영구 삭제/수정/새 그림 저장은 없다. 미저장 작업을 사이트 데이터 삭제나 빈 캔버스 덮어쓰기로 복구하지 않는다.
 

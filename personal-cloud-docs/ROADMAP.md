@@ -1,5 +1,9 @@
 # Personal Excalidraw Cloud 로드맵
 
+## 2026-10-13 최신 상태
+
+Milestone 7 공개 서버와 운영 앱 endpoint 전환 완료. 운영 Source `d86d9e27`, version/bundle 반영 확인. 공개 relay 연결 로컬 앱의 Safari/별도 브라우저 양방향 편집과 새로고침 재참여 확인. 운영 자동 브라우저 접근 차단으로 운영 화면은 미검증, 실제 sleep/cold start 뒤 복구도 미검증이다. Milestone 7 전체 검증 완료로 판정하지 않는다. 다음 개발은 Milestone 8 설계이며 아래 기록은 당시 상태다.
+
 ## 2026-10-09 현재 상태
 
 Milestone 7 후속: Safari/별도 브라우저 양방향 편집 및 자신의 undo/redo, 서버 재기동 후 편집 재전달 확인. 실행 dependency audit 0건, 다단계 Docker/Render 수동 배포 초안 준비. 공개 서버/운영 전환은 미완료. 재연결 직후 무편집 상태의 일시적 빈 화면 및 개발 도구 경고는 후속으로 유지한다.
@@ -760,7 +764,7 @@ D-012 결정에 따라 구현했다 (구글 시트/문서 버전 기록을 단�
 - [x] `excalidraw-room` Fork/Clone/upstream 등록 (`03ff4358` 기준)
 - [x] 로컬 Socket.IO 서버 구현/실행, 실제 client relay/격리/재접속 하네스 7개 통과
 - [x] Render Free WebSocket host 배포 (2026-10-13, `personal-excalidraw-room.onrender.com`, Source `e2defb1`, health/합성 relay/재접속 확인)
-- [ ] 배포 앱의 WebSocket endpoint 변경
+- [x] 배포 앱의 WebSocket endpoint 변경 (`d86d9e27`, Production success/version/bundle 확인; 운영 화면 미검증)
 - [ ] sleep 후 재연결 UX 확인
 
 이 단계에서도 공식 Firebase persistence는 먼저 유지한다.

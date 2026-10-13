@@ -1,5 +1,12 @@
 # MVP 검증 기록
 
+## 2026-10-13 운영 협업 endpoint 전환 결과
+
+- 제품 변경 `d86d9e27` Preview 성공 후 personal-cloud에 fast-forward/push. GitHub Production Source 전체 SHA 일치, 운영 version `2026-10-13T12:37:31Z-d86d9e2`, 실제 module bundle에 개인 relay 포함/기존 relay 없음 확인. 별도 Vercel env override는 최종 bundle을 통해 기대값 적용 여부를 판정했다.
+- 테스트 Origin 제거 첫 재배포는 입력에 잔여 문자열이 남아 서버 URL 검증으로 종료됐다. 이전 정상 배포가 계속 서비스했다. 편집 값 전체를 정확한 운영 Origin으로 교체하고 Save and deploy 후 Render Live `dep-db72d6nf3r2c73cvibng` 확인. 실제 운영 Origin handshake 성공과 localhost:3003 handshake 거부를 함께 확인했다. 보호 검증을 해제하거나 추가 출처를 남기지 않았다.
+- 운영 주소의 자동 브라우저 방문은 저장된 접근 설정으로 거부됐다. 다른 브라우저/간접 실행으로 우회하지 않았다. 이 거부 전에 확인한 version/bundle 결과와, 운영 화면을 실제 확인하지 못한 한계를 구분한다.
+- 생략/남은 위험: 운영 두 브라우저 UI/로그인 후 Cloud 기능, 실제 15분 sleep/cold start 복구, 협업 이미지와 모두 퇴장 후 persistence. 관련 로컬 공개 relay 브라우저 확인은 성공했지만 이를 운영 화면 검사로 기록하지 않는다. 기존 Firebase/Cloud autosave 잠금은 유지한다.
+
 ## 2026-10-13 공개 서버 앱 연결 검증
 
 - 사용자 승인으로 Render 허용 출처에 정확한 `http://localhost:3003`만 임시 추가/Save and deploy. 별도 개발 앱 실행 환경에서 공개 relay를 지정했으며 기존 개발 env 파일은 변경하지 않았다.

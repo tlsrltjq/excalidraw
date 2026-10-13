@@ -124,6 +124,8 @@ node --test personal-cloud-harness/check-room-relay.node-test.mjs
 
 ## 자체 협업 서버 공개 배포
 
+2026-10-13 후속: 운영 프론트도 `d86d9e27`로 연결 완료. 배포 SHA/version 및 actual bundle의 개인 relay URL 확인. 임시 localhost:3003 Origin은 제거했고 실제 거부 검사 통과. 로컬 서버 3003은 테스트 후 종료했다. 재현 시 실행 명령 앞에 공개 `VITE_APP_WS_SERVER_URL` 환경변수를 지정하고 정확한 테스트 Origin 승인을 받아야 한다. 운영 화면 자동 접근과 실제 sleep 복구는 미검증이다.
+
 프론트 전환 준비: `.env.production`의 `VITE_APP_WS_SERVER_URL=https://personal-excalidraw-room.onrender.com`을 빌드에 반영한다. Vercel Production에 동일 이름의 별도 env override가 있으면 저장소 값보다 우선하므로 실제 배포 bundle에서 주소를 확인한다. 롤백 값은 `https://oss-collab.excalidraw.com`이며 변경 뒤 반드시 재빌드한다. 테스트 localhost:3003 허용은 사용자 승인으로만 임시 사용하고 끝나면 제거/Save and deploy한다.
 
 2026-10-13 Free 배포 완료: `https://personal-excalidraw-room.onrender.com`, Source `e2defb1`, Docker/Free/Oregon/자동 배포 Off/`/health`. Render Live와 HTTPS health, 합성 두 클라이언트 relay/재접속/Origin 거부 확인. 운영 Vercel endpoint는 미전환이다. 아래 생성 절차는 재현용이며 같은 서비스를 중복 생성하지 않는다. 기존 '미실행' 설명은 준비 당시 기록이다.
