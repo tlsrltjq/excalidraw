@@ -1,5 +1,12 @@
 # 설계 결정 기록
 
+## D-019: 협업 persistence 계약과 Firebase 호환 adapter
+
+- 결정일: 2026-10-13, Milestone 8 첫 단위. 기존 다섯 persistence 함수를 명시적 계약과 기본 Firebase adapter로 묶고 Collab 호출부만 연결한다.
+- 기존 transaction reconcile/cache/암호화/FileManager queue는 그대로 유지한다. 파일 업로드와 scene 저장 결과 및 오류를 변환하지 않는다. 공개 API 이름/legacy 링크, ShareDialog Firebase 경로는 유지한다.
+- 검증: adapter의 입력/결과/오류 전파, 저장 상태 및 파일 부분 실패, 기존 협업 회귀/typecheck/lint/build. 네트워크 순서/저장 구현이 바뀌지 않으므로 새로운 live 장애 주입은 생략하며 이 검사가 Firebase 실서비스 검사라고 기록하지 않는다.
+- 후속 Supabase의 권한/route/CAS는 collaboration-persistence.md의 설계 후보다. 이 단계에서 anon 권한 확대, migration, backend 전환, 유료 서비스는 하지 않는다.
+
 결정이 확정되면 상태를 `결정`으로 바꾸고 근거와 영향을 기록한다.
 
 ## D-001: upstream과 개인 기능 분리

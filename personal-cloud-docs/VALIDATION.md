@@ -1,5 +1,13 @@
 # MVP 검증 기록
 
+## 2026-10-13 Milestone 8 Firebase adapter 첫 단위
+
+- 변경 파일: `excalidraw-app/collab/Collab.tsx`의 다섯 persistence 호출, `collab/persistence/types.ts`, `firebase.ts`, `index.ts`, `firebase.test.ts`, 관련 개인 문서. `data/firebase.ts`/core/DB/dependency/env/운영 배포는 변경하지 않았다.
+- 기존 함수 reference를 그대로 adapter에 연결해 transaction reconcile/scene version cache/암호화/파일 bytes/에러 반환을 유지했다. 공개 Collab API와 기존 ShareDialog Firebase 사용은 유지한다. Supabase 전환은 아니다.
+- adapter 8개: 기본 Firebase 선택/동일 함수, 동기 저장 상태, scene 인자·동일 Promise, 없는 scene/nullable socket, file bytes·부분 실패, 로드 결과·error map, scene/file 오류 전파. 기존 실제 편집기 협업 회귀 2개도 통과했다.
+- 최종 검증: `yarn test:typecheck`, `yarn test:code`, 집중 `yarn test:app --watch=false` 10개, `yarn build` 성공. 가드레일 및 diff check 통과. 초기 테스트 fixture 타입 누락/새 파일 import-order는 수정 후 재검증했다. 기존 MetaProperty lint 진단/폰트·chunk·Browserslist 빌드 경고는 유지한다.
+- 생략/남은 위험: 전체 앱 테스트/심화 장애 주입/두 실제 브라우저 Firebase 저장은 반복하지 않았다. adapter 검사에서 backend를 mock하므로 Firebase transaction/실서비스/암호화 자체의 새 검증으로 표기하지 않는다. 네트워크 저장 알고리즘은 바뀌지 않았다. Supabase 권한·route·CAS, 느린 응답/offline/충돌/이미지 실패·복원, migration/실기기 검증은 다음 단계다. Milestone 7 운영 화면 접근 차단/실제 sleep 검증도 그대로 남긴다.
+
 ## 2026-10-13 운영 협업 endpoint 전환 결과
 
 - 제품 변경 `d86d9e27` Preview 성공 후 personal-cloud에 fast-forward/push. GitHub Production Source 전체 SHA 일치, 운영 version `2026-10-13T12:37:31Z-d86d9e2`, 실제 module bundle에 개인 relay 포함/기존 relay 없음 확인. 별도 Vercel env override는 최종 bundle을 통해 기대값 적용 여부를 판정했다.

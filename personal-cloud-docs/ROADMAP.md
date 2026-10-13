@@ -775,8 +775,8 @@ D-012 결정에 따라 구현했다 (구글 시트/문서 버전 기록을 단�
 
 ## Milestone 8: 공동편집 Persistence 독립
 
-- [ ] `CollabPersistence` interface 설계
-- [ ] 기존 Firebase adapter 작성
+- [x] `CollabPersistence` interface 설계 및 controller 연결 (2026-10-13)
+- [x] 기존 Firebase adapter 작성, 집중 테스트 10개/typecheck/lint/build 통과
 - [ ] Supabase adapter 작성
 - [ ] client-side encryption 유지
 - [ ] encrypted scene/file 저장
@@ -784,6 +784,8 @@ D-012 결정에 따라 구현했다 (구글 시트/문서 버전 기록을 단�
 - [ ] room 복구 및 동시 저장 테스트
 
 완료 조건: Socket transport와 persistence 모두 개인 인프라를 사용한다.
+
+2026-10-13 첫 단위 완료: 기존 Firebase 함수를 그대로 연결하는 계약/adapter만 구현했다. 실제 persistence는 여전히 Firebase이며 Supabase adapter/권한/CAS는 후속이다. 설계/범위는 `collaboration-persistence.md` 참고. 이 단위만으로 Milestone 8 전체 완료로 표시하지 않는다.
 
 ## Milestone 9: AI Gateway
 

@@ -11,8 +11,11 @@
 - [VALIDATION.md](./VALIDATION.md): MVP 수동/자동 검증 결과와 미해결 항목
 - [operations.md](./operations.md): 로컬 서버 실행/재시작, Supabase 복구, Vercel 배포, 장애 진단, DB 접근 정책 확인
 - [collaboration.md](./collaboration.md): 자체 협업 서버 구성, 앱/서버 저장소 경계, 로컬 진행 결과 및 남은 배포 범위
+- [collaboration-persistence.md](./collaboration-persistence.md): Milestone 8 저장 계약/Firebase adapter와 Supabase 권한·암호화·동시 저장 설계 후보
 
 ## 지금 어디까지 왔나
+
+Milestone 8 첫 단위 구현 완료 (2026-10-13): `codex/collab-persistence-adapter`에서 저장 계약/Firebase adapter와 controller 연결, 집중 테스트 10개 및 typecheck/lint/build를 완료했다. 현재 Firebase 동작과 운영 배포는 유지한다. 다음은 Supabase room 권한/route/CAS 최종 설계 및 adapter 구현이다. 상세 범위는 collaboration-persistence.md를 따른다.
 
 2026-10-13 최신: 자체 협업 서버 Render Free 배포 및 운영 앱 연결 완료. 서버 `e2defb1`, 운영 앱 Source `d86d9e27`, version `d86d9e2`와 실제 bundle의 개인 relay 주소 확인. 공개 relay를 연결한 localhost:3003 앱에서 Safari/별도 브라우저 양방향 편집·새로고침 재참여 확인. 임시 Origin은 제거하고 실제 차단 검사 통과. 운영 주소의 자동 브라우저 접근은 저장된 접근 설정에 의해 차단돼 운영 화면 검증은 미완료. 실제 sleep 뒤 복구도 남아 있다. 다음 개발은 Milestone 8 협업 저장 독립 설계이며 Milestone 7 잔여 검증을 완료로 지우지 않는다. 카드·유료 플랜은 사용하지 않는다. 아래 날짜별 기록은 당시 상태다.
 
