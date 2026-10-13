@@ -1,5 +1,12 @@
 # MVP 검증 기록
 
+## 2026-10-13 Render Free 공개 배포 결과
+
+- 사용자 승인으로 Free 서비스 생성. 카드 등록/유료 전환 없음. `personal-excalidraw-room.onrender.com`, Docker build/Deploy succeeded/Live, Source `e2defb15e792f7d801efb71dc8410fceeb10e1a9` 확인. Auto-Deploy Off/health `/health` 유지.
+- HTTPS `/health` 성공 및 status ok. 두 실제 Node 클라이언트의 TLS Socket.IO/AES-GCM 암호문 전달, reconnect 후 재전달, foreign Origin 거부 통과. 임의 합성 방으로 검사하고 연결을 모두 종료했다. room key/URL/사용자 scene은 기록하지 않는다.
+- 월별 계정 한도 750시간/5GB/500분 빌드, 카드 없음과 빌드 추가 지출 한도 $0 확인. 숫자는 확인일 기준이고 workspace에서 공유한다.
+- 생략: 공개 서버를 연결한 프론트의 두 브라우저 편집, 15분 실제 sleep 이후 cold start/재연결, 이미지/Firebase persistence. 운영 Vercel 환경변수/코드/DB 변경 없음. 다음은 테스트 프론트 연결 검증 후 운영 연결 전환이다.
+
 ## 2026-10-13 서버 커밋/push 및 배포 준비 재개
 
 - 서버 build(typecheck)/lint, 실행 dependency audit 0건, 실제 relay 하네스 7개, app guardrails 7 changed files 재확인. 서버 `e2defb1` 커밋/push 및 원격 전체 SHA 일치 확인.

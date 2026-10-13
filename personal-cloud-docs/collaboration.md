@@ -11,6 +11,12 @@
 
 ## Milestone 7 범위
 
+### 무료 공개 배포 실행 (2026-10-13)
+
+사용자가 Free 공개 서비스 생성을 승인했다. 배포 Source `e2defb1`, Docker/Free/자동 배포 Off/`/health`를 확인한 뒤 생성 버튼을 실행했다. 완료 조건은 실제 서비스 상태/Source/HTTPS health 확인이며 운영 프론트 endpoint 전환은 별도다. 무료 계정 화면에는 월 750시간/5GB 전송량/500분 빌드, 현재 모두 0 사용으로 표시됐다. 카드 없음/추가 빌드 지출 한도 $0을 유지한다. 15분 무통신 sleep과 cold start 지연, 공유 workspace 한도, 암호문 relay의 공개 남용 가능성은 남는다. 한도 초과나 결제 요구를 유료 전환으로 해결하지 않는다.
+
+결과: Render Docker build/배포 성공, Live 및 Source 전체 SHA 일치 확인. 주소 `https://personal-excalidraw-room.onrender.com`, `/health`는 HTTP 성공과 `{"status":"ok"}` 반환. 실제 두 Node Socket.IO 클라이언트의 TLS WebSocket/같은 방 AES-GCM bytes 전달/재접속 후 재전달/외부 Origin 거부 확인. 합성 방과 key는 기록하지 않고 모든 probe 연결을 종료했다. 공개 브라우저 편집/실제 sleep 뒤 복구는 미검증이며 운영 프론트 연결은 바꾸지 않았다. 이전의 Docker 미검증 기록은 당시 로컬 daemon에 관한 것이며 이번 Render container 실행 성공과 구분한다.
+
 기존 앱의 협업 transport만 개인 excalidraw-room 서버로 전환한다. 기존 암호화/scene reconcile/undo/redo/파일 업로드와 Firebase persistence를 유지한다. 개인 Cloud autosave는 기존대로 협업 중 중지한다.
 
 ```text

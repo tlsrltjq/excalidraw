@@ -122,9 +122,19 @@ node --test personal-cloud-harness/check-room-relay.node-test.mjs
 
 공개 배포는 별도 단계다. Node 24 Dockerfile은 준비했지만 컨테이너 실행은 미검증이다. 기존 서버 dependency 점검, TLS를 지원하는 지속 실행 WebSocket host, 정확한 운영 Origin, HOST/PORT 및 health 설정, 남용 제한을 먼저 준비한다. 컨테이너는 내부에서 0.0.0.0에 바인딩하므로 검토 없이 포트를 외부 공개하지 않는다. Vercel 프론트 배포만으로 room 서버가 생성되지 않는다. 실제 공개 서버 URL이 준비된 후에만 Vercel의 `VITE_APP_WS_SERVER_URL`을 바꾸고 새 빌드를 실행한다.
 
-## 자체 협업 서버 공개 배포 (아직 미실행)
+## 자체 협업 서버 공개 배포
+
+2026-10-13 Free 배포 완료: `https://personal-excalidraw-room.onrender.com`, Source `e2defb1`, Docker/Free/Oregon/자동 배포 Off/`/health`. Render Live와 HTTPS health, 합성 두 클라이언트 relay/재접속/Origin 거부 확인. 운영 Vercel endpoint는 미전환이다. 아래 생성 절차는 재현용이며 같은 서비스를 중복 생성하지 않는다. 기존 '미실행' 설명은 준비 당시 기록이다.
 
 2026-10-13: 서버 `e2defb1`/앱 기록 `c9506cca` 기능 브랜치 push 완료. 사용자는 무료만 허용했다. Render Hobby/카드 미등록/빌드 추가 지출 한도 $0을 읽기 전용으로 확인했다. 카드 추가/유료 플랜은 선택하지 않는다. 무료 사용량 초과 시 중단되는 제약을 수용하고 무제한 무료나 상시 실행으로 안내하지 않는다. 공개 저장소 연결로 GitHub 계정의 추가 저장소 권한은 부여하지 않았다.
+
+### 무료 사용량 확인
+
+사용할 때 직접 서버를 켜고 끌 필요는 없다. 15분간 inbound HTTP/WebSocket 메시지가 없으면 자동 sleep하고 새 HTTP 요청/WebSocket 접속으로 자동 기동한다. 약 1분 cold start 동안 협업 연결 재시도가 필요할 수 있다. 실제 sleep 이후 브라우저 복구는 아직 확인하지 않았다. 750시간은 31일 6시간이며 단일 서버의 31일 상시 실행(744시간)은 시간 한도 안이다. 절전 방지용 인위적인 ping은 만들지 않는다.
+
+Render workspace 메뉴 → Billing → Monthly Included Usage에서 확인한다. 2026-10-13 실제 계정 표시: Free Instance Hours 750시간/월, Included Bandwidth 5GB/월, Included Pipeline Minutes 500분/월. 여러 Render 서비스가 workspace 한도를 공유한다. 실행 시간은 매월 초 750시간으로 초기화되며 이월되지 않는다. 빌드 분량은 배포할 때 소모하며 사용자의 편집 시간과 다르다. 전송량은 협업 이벤트 크기/참여자/횟수에 좌우되므로 무제한 사용으로 추정하지 않는다.
+
+단일 서버의 31일 상시 실행은 744시간이므로 시간 한도 안이지만, 실제로는 유휴 sleep이 있다. 일반 단독 편집/Cloud 저장은 이 relay를 사용하지 않으므로 Render 전송량과 Supabase/Vercel/Firebase의 별도 무료 한도를 혼동하지 않는다. 혼자 가벼운 협업에는 충분할 것으로 예상하되 실측 후 판단한다. 카드가 없는 상태에서 한도 초과는 과금 대신 서비스/신규 빌드 중단이 될 수 있다. 카드를 추가하면 이 조건이 달라진다. [공식 무료 정책](https://render.com/docs/free).
 
 1. 별도 서버 저장소 변경을 검토/커밋/push한다. `render.yaml`의 branch가 실제 원격 branch와 일치해야 한다. 로컬 초안만으로 원격 서비스에 코드가 반영되지는 않는다.
 2. Render 계정 로그인 후 Blueprint 또는 Docker Web Service로 개인 `excalidraw-room` 저장소를 연결한다. 서비스 생성 전에 Free 플랜, 결제/한도, 공개 접근을 확인한다. 자동 배포는 off로 두고 첫 배포를 수동 실행한다.

@@ -759,7 +759,7 @@ D-012 결정에 따라 구현했다 (구글 시트/문서 버전 기록을 단�
 - [x] 기존 공동편집 회귀 테스트 2개 통과. 두 브라우저 동시 편집은 별도다.
 - [x] `excalidraw-room` Fork/Clone/upstream 등록 (`03ff4358` 기준)
 - [x] 로컬 Socket.IO 서버 구현/실행, 실제 client relay/격리/재접속 하네스 7개 통과
-- [ ] Render 등 WebSocket host에 배포
+- [x] Render Free WebSocket host 배포 (2026-10-13, `personal-excalidraw-room.onrender.com`, Source `e2defb1`, health/합성 relay/재접속 확인)
 - [ ] 배포 앱의 WebSocket endpoint 변경
 - [ ] sleep 후 재연결 UX 확인
 
