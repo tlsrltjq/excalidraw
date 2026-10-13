@@ -1,5 +1,12 @@
 # 설계 결정 기록
 
+## D-021: 초대 검증 RPC와 scene CAS 서버 경계
+
+- 결정 (2026-10-13): 별도 유료 gateway 대신 Supabase PostgreSQL RPC가 scene 요청마다 room/invite/proof hash/만료/폐기/scope를 검사한다. 로그인/게스트 모두 동일한 bearer 초대 검증을 거치며 로그인만으로 타인의 방 권한을 얻지 않는다.
+- room/초대 생성·폐기는 auth.uid()로 owner를 확인한다. room/invite는 owner SELECT만 허용하고 scene 및 모든 직접 쓰기는 anon/authenticated에 GRANT하지 않는다. SECURITY DEFINER 함수는 빈 search_path, 명시적 schema, 기본 PUBLIC/anon/authenticated EXECUTE 회수 후 필요한 함수만 허용한다.
+- scene은 최대 2 MiB 암호문/12-byte IV와 safe integer revision으로 제한한다. CAS 생성은 1, 갱신은 expected + 1, 충돌은 명시 반환한다. room/초대 잠금으로 폐기와 진행 중 저장을 직렬화한다. 이미 완료된 요청/다운로드는 회수하지 못한다.
+- 이번 완료 조건: additive migration 작성, RPC client byte 변환/응답 검증/권한 오류 처리와 집중 테스트, rollback DB 검사 준비. 실제 DB 적용·HTTP 두 계정/게스트·Storage·relay ticket·입장 UI는 별도이며 준비 전 새 방을 활성화하지 않는다. RPC는 HTTP body로 proof를 받으므로 인프라 request-body/SQL parameter 로그에 비밀이 남지 않도록 운영 설정 검토가 필요하다. rate limit/총 저장 용량 정책도 운영 활성화 전 후속이다.
+
 ## D-020: 로그인/게스트 선택과 초대 기반 권한
 
 - 사용자 결정 (2026-10-13): 새 방 입장 시 로그인 참여와 게스트 참여 모두 제공한다. 로그인은 신원 선택이며 두 방식 모두 유효한 초대 권한을 검증한다. room 생성/초대 발급·폐기는 로그인 owner만 한다.

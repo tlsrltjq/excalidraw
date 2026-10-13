@@ -21,6 +21,8 @@
 
 ## 적용 방법
 
+`20261013150000_create_collab_scene_rpc.sql`은 협업 room/초대/암호화 scene 및 검증/CAS RPC다. 로컬 일회용 PostgreSQL에서만 적용·검사했고 운영에는 미적용이다. owner SELECT/disabled 갱신과 제한된 RPC 이외의 table 접근은 닫는다. guest에 공개된 RPC도 매 요청 proof/room/만료/폐기/scope를 검증한다. 운영 적용 전 `personal-cloud-docs/operations.md`의 협업 DB 검사와 D-021 후속 조건을 확인한다. fixture용 `collab-local-bootstrap.sql`은 운영에 실행하지 않는다.
+
 Supabase CLI를 쓰는 경우:
 
 ```bash

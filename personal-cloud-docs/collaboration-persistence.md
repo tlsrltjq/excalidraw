@@ -34,6 +34,18 @@ Portal -> 암호화된 실시간 메시지 -> 개인 relay
 
 ## Supabase 후속 구현
 
+### 서버 scene 구현 단위 (D-021)
+
+구현: `supabase/migrations/20261013150000_create_collab_scene_rpc.sql`의 room/invite/scene + 관리/check/read/CAS 함수. proof SHA-256은 PostgreSQL 기본 sha256(bytea)를 사용해 추가 extension이 필요 없다. owner에게 room/초대 SELECT와 room disabled UPDATE만 주며 직접 scene 접근/테이블 생성·쓰기/권한 helper 호출은 닫았다. 비로그인과 로그인 역할에 check/read/CAS RPC만 공개하고 항상 proof를 검증한다. 로그인/게스트 선택은 UI 후속이며 계정별 초대 대상 지정 기능은 아니다.
+
+`supabaseSceneStore.ts`는 SupabaseClient와 검증할 invite를 받아 scene writer의 Store 계약을 구현한다. key는 전송하지 않고 proof는 RPC body에만 전달한다. PostgreSQL base64 줄바꿈을 처리하고 bytes/IV/revision/sceneVersion/성공 revision을 확인한다. RPC 실패에 포함될 수 있는 세부 body는 UI 오류에 노출하지 않는다. 실제 기본 adapter/controller에서는 아직 호출하지 않는다.
+
+검증: 일회용 로컬 PostgreSQL 16에 migration을 적용해 역할 기반 권한 28항목/rollback/두 연결의 첫 CAS 경쟁을 통과했다. 실제 Supabase Auth/PostgREST HTTP/운영 DB 검사가 아니다. client mock test와 기존 협업 집중 회귀는 합계 50개 통과했다.
+
+완료 조건: room/초대 owner 관리와 로그인·게스트 공통 초대 검증 RPC, 원자적 scene CAS, 명시적 GRANT/RLS, 브라우저 ciphertext 변환 및 오류 검증. 운영 DB는 자동 적용하지 않는다. Storage/relay ticket/입장 선택 UI는 아직 연결하지 않는다. SQL 로컬 실행 여부와 mocked RPC 검사를 구분해 기록한다.
+
+위험: SECURITY DEFINER는 RLS를 우회하므로 함수 내부에서 모든 권한을 검사한다. 직접 테이블 쓰기 및 scene 읽기를 닫고 초대 검증만 제한적으로 노출한다. 폐기는 진행 중 DB transaction과 직렬화하며 이미 받은 자료를 회수하지 않는다. scene 요청 2 MiB 제한은 전체 저장 용량/요청 rate limit의 대체가 아니다. 참고: [Supabase 함수 권한](https://supabase.com/docs/guides/database/functions).
+
 - 기존 Firebase 링크를 자동으로 Supabase에 보내지 않는다. 새 room의 persistence 구분 정보를 hash 외부에 두는 명시적인 route가 필요하다. legacy 기본값은 Firebase다.
 - scene/file은 별도 저장한다. DB에는 ciphertext/IV와 원자적 revision, Storage에는 기존 encoder의 암호화된 bytes를 보관한다. Render ephemeral filesystem에 영구 데이터를 저장하지 않는다.
 - 서버는 roomKey를 받지 않는다. 클라이언트가 remote ciphertext를 복호화/restore/reconcile하고 expected revision으로 CAS 저장한다. 충돌 시 제한된 재시도, stale room/generation 및 room별 single-flight를 검사한다.
@@ -49,7 +61,8 @@ Portal -> 암호화된 실시간 메시지 -> 개인 relay
 - [x] 암호화 scene CAS worker/single-flight/stale 결과/충돌·offline 테스트
 - [ ] 실제 로그인/게스트 선택 화면과 gateway 입장 처리
 - [ ] Supabase 권한/route/CAS 최종 설계
+- [x] scene 초대 검증/owner 관리/CAS migration 및 RPC store 작성, 로컬 PostgreSQL 권한·경쟁 검증 (운영 미적용)
 - [ ] DB/Storage migration과 Supabase adapter
 - [ ] encrypted scene/file 실기기 복구 및 운영 전환
 
-기본 adapter와 client invite/CAS worker까지 구현했다. 아직 실제 Supabase 권한 검증/저장 기능이나 사용자 입장 선택 화면이 완성된 것은 아니며 운영 전환도 하지 않았다.
+기본 adapter, client invite/CAS worker, scene 권한 SQL/RPC store까지 구현했다. 운영 DB 적용, 전체 Supabase persistence adapter/Storage/relay ticket/사용자 입장 선택 화면은 미완성이며 운영 전환도 하지 않았다.

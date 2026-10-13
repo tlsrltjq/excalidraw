@@ -14,6 +14,22 @@
 
 ## 노트북에서 다시 시작
 
+### 일회용 협업 DB 검사 (2026-10-13)
+
+실제 운영 Supabase와 무관한 SQL 검사다. Docker Desktop을 실행한 뒤 저장소 루트에서 아래를 실행한다. Docker가 없거나 켜지지 않았으면 실패하므로 운영 DB로 대신 실행하지 않는다.
+
+```bash
+node personal-cloud-harness/check-collab-scene.node-test.mjs
+```
+
+하네스는 `postgres:16` 일회용 컨테이너를 만들고 network/host port를 열지 않는다. 이미지가 없으면 최초 실행 시 내려받는다. container 내부 local trust 인증은 이 격리 fixture에만 사용하며 운영 설정이 아니다. 최소 auth.uid/역할 stub, migration, rollback 권한 28항목, rollback 보존, 두 DB 연결 CAS 경쟁을 검사한 뒤 컨테이너를 제거한다. 앱의 `.env.local`이나 운영 데이터에 접속하지 않는다.
+
+정상 종료하면 세 줄 PASS가 표시된다. 강제 중단으로 컨테이너가 남으면 `docker ps -a --filter name=personal-cloud-collab-test-`로 목록을 확인하고, 이 검사에서 생성한 정확한 이름만 `docker rm -f <확인한_컨테이너명>`으로 제거한다. 다른 앱/DB 컨테이너는 제거하지 않는다. `collab-local-bootstrap.sql`은 기존 DB에 실행하면 안 된다.
+
+새 migration `20261013150000_create_collab_scene_rpc.sql`은 현재 운영에 미적용이다. 실제 적용 전 HTTP/JWT 검사 계획과 body 로그/rate limit/용량 정책을 확인한다. migration만 적용해도 Storage/relay ticket/입장 UI/provider 전환은 완성되지 않는다. 기존 migration을 전부 다시 실행하거나 RLS를 끄지 않는다.
+
+### 웹 앱 시작
+
 1. 터미널을 열고 저장소로 이동한다.
 
 ```bash

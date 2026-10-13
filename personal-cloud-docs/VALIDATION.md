@@ -1,5 +1,14 @@
 # MVP 검증 기록
 
+## 2026-10-13 초대 검증 RPC 및 scene 저장 서버
+
+- 변경: collaboration scene migration, `supabaseSceneStore.ts`/test, 로컬 DB bootstrap/rollback SQL/실행 하네스 및 계획/결정/실행 문서. core/dependency/기존 Firebase/운영 env/실제 Supabase/relay는 변경하지 않았다.
+- 일회용 PostgreSQL 16 (Docker, 외부 network/host port 없음)에 migration 적용 성공. owner와 다른 계정/anon DB 역할에서 권한 28항목 통과: 테이블 직접 접근/내부 함수/임의 생성 차단, owner 관리/다른 계정 RLS, 로그인만으로 권한 획득 금지, valid guest/다른 계정 초대 접근, read scope, 다른 방/missing proof/만료/폐기/비활성 방, 초기/중복/오래된 CAS 및 invalid revision/IV/과대 ciphertext. 전체 rollback 후 room/scene/user 0행 확인. 독립 DB 연결 두 개의 실제 동시 최초 CAS에서 saved/conflict 각각 1개 및 revision 1 확인. 컨테이너 제거로 fixture 정리.
+- 집중 앱 테스트 50개 통과 (새 RPC store 15 + 이전 35). 실제 HKDF proof, base64 byte 보존, NULL 초기 revision/충돌 응답, malformed scene/잘못된 성공 revision/다른 방/크기 제한/권한 오류/transport rejection 세부 메시지 비노출 검사. RPC 자체는 mock이며 DB 하네스와 구분한다.
+- typecheck/전체 lint/build 통과. 기존 Firebase config undefined/MetaProperty/폰트·chunk·Browserslist/Node 경고는 유지한다. 새 모듈은 runtime에 미연결이므로 빌드는 활성화된 Supabase 입장 검사가 아니다.
+- scoped source/하네스 lint, formatting, guardrails/diff 검사 통과. 하네스 반복 실행에서 Docker 초기화용 임시 socket 서버를 ready로 오인하는 경합을 발견해 container 내부 TCP ready 검사로 수정하고 재실행했다. 운영 코드 오류가 아니며 host port는 열지 않는다.
+- 생략/남은 위험: 전체 앱 테스트, 실제 Supabase Auth/JWT/PostgREST HTTP/두 브라우저, DB 적용, Storage, ticket 서명/relay 검증, 로그인·게스트 선택 화면, 권한 폐기 중 이미 실행 중인 요청의 실제 HTTP 경합, rate limit/총 용량/인프라 body 로그 검토. local auth.uid stub/DB 역할 검사를 실제 로그인 인증으로 표기하지 않는다. 이번 단위는 운영 기능 활성화가 아니다.
+
 ## 2026-10-13 초대 proof 및 암호화 CAS 기반
 
 - 변경: `collab/persistence/invites.ts`/test, `sceneWriter.ts`/test와 관련 docs. 기존 Firebase adapter/controller, packages, 운영 env/DB/Storage/relay는 변경하지 않았다. 새 코드의 운영 입장 경로는 아직 연결하지 않는다.

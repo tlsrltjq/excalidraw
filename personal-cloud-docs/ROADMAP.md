@@ -775,6 +775,8 @@ D-012 결정에 따라 구현했다 (구글 시트/문서 버전 기록을 단�
 
 ## Milestone 8: 공동편집 Persistence 독립
 
+2026-10-13 서버 scene 단위: D-021의 owner 관리/초대 검증/원자적 CAS migration 및 Supabase scene store 구현. 일회용 로컬 PostgreSQL의 역할 기반 권한 28항목, rollback 보존, 실제 두 DB 연결 CAS 경쟁 확인. 운영 DB 적용/HTTP JWT·게스트 검증/Storage/relay ticket/입장 UI는 남아 있으며 provider는 아직 Firebase다.
+
 2026-10-13 후속: 로그인/게스트 선택 지원으로 결정(D-020). client invite route/proof/hash와 암호화 scene CAS/single-flight worker 구현. 실제 gateway/DB/RLS/Storage/입장 UI/relay auth는 미연결이며 전체 단계는 진행 중이다.
 
 - [x] `CollabPersistence` interface 설계 및 controller 연결 (2026-10-13)
