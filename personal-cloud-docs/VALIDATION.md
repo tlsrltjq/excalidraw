@@ -6,6 +6,7 @@
 - Docker daemon은 여전히 연결되지 않아 container build는 생략했다. 앱 제품 코드가 바뀌지 않아 전체 앱 검증과 지난 Safari 편집 검사를 반복하지 않았다.
 - 서버 기능 브랜치의 GitHub Actions 실행 목록은 조회 당시 비어 있었다. 로컬 검증을 CI 성공으로 기록하지 않는다. master 전용 upstream Docker publish는 실행하지 않았다.
 - 사용자 로그인 후 Safari Render 대시보드 확인. 공개 서비스 생성/운영 endpoint 전환은 아직 하지 않았다.
+- Render 입력값: 개인 공개 저장소/서버 기능 브랜치/Docker/Free($0)/Origin 제한/health/Auto-Deploy Off 확인. Hobby/카드 없음/빌드 추가 지출 한도 $0 확인. 생성 직전 공개 접근 승인을 요청했으며 결제는 허용하지 않는다. 앱 기록 `c9506cca`도 push했다.
 
 ## 2026-10-09 자체 협업 서버 후속 검증/배포 준비
 

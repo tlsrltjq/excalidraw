@@ -124,6 +124,8 @@ node --test personal-cloud-harness/check-room-relay.node-test.mjs
 
 ## 자체 협업 서버 공개 배포 (아직 미실행)
 
+2026-10-13: 서버 `e2defb1`/앱 기록 `c9506cca` 기능 브랜치 push 완료. 사용자는 무료만 허용했다. Render Hobby/카드 미등록/빌드 추가 지출 한도 $0을 읽기 전용으로 확인했다. 카드 추가/유료 플랜은 선택하지 않는다. 무료 사용량 초과 시 중단되는 제약을 수용하고 무제한 무료나 상시 실행으로 안내하지 않는다. 공개 저장소 연결로 GitHub 계정의 추가 저장소 권한은 부여하지 않았다.
+
 1. 별도 서버 저장소 변경을 검토/커밋/push한다. `render.yaml`의 branch가 실제 원격 branch와 일치해야 한다. 로컬 초안만으로 원격 서비스에 코드가 반영되지는 않는다.
 2. Render 계정 로그인 후 Blueprint 또는 Docker Web Service로 개인 `excalidraw-room` 저장소를 연결한다. 서비스 생성 전에 Free 플랜, 결제/한도, 공개 접근을 확인한다. 자동 배포는 off로 두고 첫 배포를 수동 실행한다.
 3. HOST `0.0.0.0`, PORT `10000`, NODE_ENV `production`, CORS_ORIGIN `https://personal-excalidraw.vercel.app`, health path `/health`를 설정한다. Preview는 검증한 정확한 Origin만 추가하고 wildcard를 쓰지 않는다.

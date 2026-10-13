@@ -6,6 +6,8 @@
 - 위험: 기능 브랜치 push를 운영 서버 배포로 기록하지 않는다. Render 계정/Free 플랜/공개 접근을 확인하기 전 서비스 생성이나 운영 endpoint 변경은 하지 않는다. Docker 실행은 아직 미검증이며 재연결 직후 빈 화면 관찰은 유지한다.
 - 서버 `e2defb15e792f7d801efb71dc8410fceeb10e1a9`를 `origin/codex/personal-room-server`에 push하고 원격 SHA 일치를 확인했다. Docker publish workflow는 master 전용이며 기능 브랜치 push로 실행되지 않는다. GitHub Actions 실행 기록은 조회 당시 없었다.
 - 계정 확인: 처음에는 가입 화면이었으나 사용자가 로그인 완료 후 Safari의 Render 대시보드를 확인했다. 서비스 생성/공개 접근은 설정 확인 후 승인받는다.
+- 앱 기록/하네스도 `c9506cca`로 커밋/push했다. 운영 통합 브랜치는 변경하지 않았다.
+- 무료 전용 제약: 사용자 요청으로 Free만 사용하고 카드 등록/유료 전환/결제 요청 시 중단한다. Safari에서 Hobby, No card on file, build pipeline 추가 지출 한도 $0 확인. 현재 새 서비스 입력은 공개 저장소, `codex/personal-room-server`, Docker, Free, Oregon, 자동 배포 Off, `/health` 및 네 환경변수로 준비했다. Deploy는 공개 접근 승인 전 누르지 않는다.
 
 ## Milestone 7 범위
 
