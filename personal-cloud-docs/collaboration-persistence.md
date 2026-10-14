@@ -118,8 +118,18 @@ HTTP handler는 exact Origin allowlist, POST/OPTIONS, strict 입력 allowlist, 4
 다음 relay 구현에서 socket마다 암호학적 random challenge를 발급하고 입장권의 challenge와 Origin/room을 비교한다. 재연결은 새 challenge, 만료는 재승인으로 처리하며 전달 이벤트마다 만료와 write 권한을 확인해야 한다. read 사용자의 scene/file 쓰기·broadcast/follow 요청 권한 및 수신 권한도 별도로 구현한다. 60초 ticket이 이미 발급됐다면 초대 폐기는 즉시 반영되지 않을 수 있다. 브라우저는 ticket을 URL/localStorage/로그에 보관하지 않고 socket 세션 메모리에서만 사용해야 한다.
 
 - [x] 입장권 서명/검증 계약과 HTTP 발급기 및 미배포 RPC entrypoint
-- [ ] relay challenge/public key verification/갱신/모든 전송 권한 검사
+- [x] relay challenge/public key verification/갱신/송수신 권한 검사 구현 및 로컬 검증 (운영 미배포)
 - [ ] 프론트 입장·provider 연결과 읽기 전용 UI
 - [ ] 운영 key 등록/배포·실제 Supabase HTTP 및 두 클라이언트 검증
 
 이번에는 별도 relay 저장소나 운영 설정을 수정하지 않았다. 두 저장소 간 verifier 계약 동기화 방법도 relay 구현 단위에서 기록한다.
+
+### relay 입장 연결 (2026-10-14, D-026)
+
+별도 서버 `src/admission.ts`/`src/index.ts`에서 `COLLAB_TICKET_PUBLIC_JWK`만 import한다. private JWK나 잘못된 공개 키는 거부하고 설정이 없으면 sc_ 방만 닫는다. connection의 `collab-challenge`는 `{challenge}`를 전달한다. 프론트는 검증한 초대 proof로 Edge에 ticket을 요청한 뒤 `join-collab-room({roomId,ticket}, ack)`을 호출하고 `{ok:true}` 확인 이후 편집기를 협업 상태로 전환해야 한다. legacy `join-room`은 기존 hex 방만 받는다.
+
+`renew-collab-ticket(ticket, ack)`은 같은 room/Origin/challenge와 더 늦은 exp만 허용한다. 서명은 입장/갱신 때 검증하고 검증한 immutable grant의 expiry/scope는 모든 송신·수신 및 참여 목록/follow 결과 전달에서 다시 확인한다. 만료 timer는 `collab-expired` 후 연결을 끊는다. event loop에서 timer 처리가 늦어져도 만료된 대상에는 bytes를 전달하지 않는다. read는 reliable/volatile/follow 요청을 보낼 수 없고 write broadcast를 받을 수 있다. 갱신에 따른 read 다운그레이드도 즉시 반영한다.
+
+한 소켓의 검증 요청은 single-flight이며 60초당 최대 10회다. 재연결은 새 challenge로 새 ticket을 발급한다. relay의 `src/ticket.ts`는 Edge 계약의 byte-identical 사본이며 하네스가 이를 확인한다. 동일 계약을 유지하기 위해 signer export도 포함하지만 relay는 verifier만 호출하고 private key는 취급하지 않는다. Node 24 런타임에 맞춰 TypeScript ES2020/CommonJS 출력을 명시했다. multi-process/Redis adapter로 바꿀 때는 현재 local recipient lookup을 다시 설계해야 한다.
+
+프론트 갱신 timer/실패 안내와 read-only UI/provider 수명주기는 아직 연결하지 않았다. 폐기 이후 이미 발급한 ticket은 최대 60초 유효할 수 있다. per-socket 검증 제한은 전역 연결 수/Origin 위조/native client 남용/전송량 제한을 대체하지 않는다. 운영 Render/Edge/DB/키는 변경하지 않았다.

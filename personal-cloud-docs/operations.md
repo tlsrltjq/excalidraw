@@ -14,6 +14,22 @@
 
 ## 노트북에서 다시 시작
 
+### 미배포 relay 입장 검사 (2026-10-14)
+
+Node 24 및 이미 설치한 두 저장소 dependencies가 필요하다. 서버 저장소에서 먼저 빌드하고 앱 저장소에서 하네스를 실행한다.
+
+```bash
+cd /Users/shingiseop/workspace/personal/excalidraw-room
+yarn build
+yarn test:code
+cd /Users/shingiseop/workspace/personal/excalidraw
+node --test personal-cloud-harness/check-room-admission.node-test.mjs
+```
+
+검사는 loopback의 비어 있는 임시 포트에서 서버를 직접 시작한다. 기존 3002 서버/브라우저/운영 DB를 재기동하지 않는다. P-256 테스트 키는 메모리에서 생성하고 공개 키만 테스트 자식 프로세스 환경에 전달하며 실제 사용자 그림/키를 사용하지 않는다. 끝나면 두 임시 서버와 연결을 종료한다. 새 방 검사와 같은 바이너리의 기존 relay 7개 검사도 포함하며 verifier 소스 parity를 검사한다. Node가 `.ts`를 검사할 때 module type warning이 나올 수 있지만 root package module 설정을 바꾸지 않는다.
+
+향후 실제 서버의 공개 키 설정 이름은 `COLLAB_TICKET_PUBLIC_JWK`다. private JWK의 `d` 필드가 있으면 import하지 않는다. 미설정/잘못된 설정 때 기존 hex 방은 동작하고 새 sc_ 방은 거부된다. Render에 지금 등록하거나 자동 배포를 켜지 않는다. 실제 활성화는 Edge 공개 키 쌍/프론트 갱신·실패 안내/read-only UI/부하·로그 정책 확인 이후 진행한다. 과거 실행 방법의 `yarn start:local`은 계속 유효하다.
+
 ### 미배포 입장권 함수 검사 (2026-10-14)
 
 `collab-ticket` 함수도 아직 운영에 배포하지 않았다. 타입 확인은 운영 서비스나 secret 없이 아래처럼 실행한다.

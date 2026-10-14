@@ -1,5 +1,14 @@
 # 설계 결정 기록
 
+## D-026: relay socket 입장·갱신·전송 경계
+
+- 범위 (2026-10-14): 별도 relay 저장소에 sc_ room join/renew acknowledgement, socket별 32-byte random challenge, 공개 P-256 JWK 검증을 연결한다. 공개 키 없으면 새 방만 닫고 legacy hex room은 유지한다. private key/JWT/proof를 relay에 전달하지 않는다. 이번에는 배포/프론트 연결을 하지 않는다.
+- 서명 verifier는 발급기 ticket.ts와 byte-identical 사본으로 관리하고 하네스에서 일치를 검사한다. signer export는 계약 동기화를 위해 포함되지만 relay에서는 호출하지 않고 private key를 import하지 않는다. 추가 dependency 없이 Node 24 Web Crypto를 쓴다.
+- 검증한 ticket의 scope/expiry를 서버 세션에 저장하고 모든 송수신·참여 목록·follow 전달에서 expiry/membership를 동기 재확인한다. 60초 만료 timer는 연결을 종료하며 이벤트 루프 지연 때도 수신자를 필터한다. 갱신은 같은 room/Origin/challenge의 새 서명/더 늦은 expiry만 허용한다. 동시 검증 single-flight와 socket당 60초/10회 시도 제한을 둔다.
+- read scope는 암호문 수신만 허용하고 reliable/volatile/follow 송신은 차단한다. write와 read 다운그레이드는 새 ticket에 따른다. 재연결은 새 challenge를 요구하며 이전 socket ticket은 재사용하지 않는다. 이미 전달한 bytes는 회수할 수 없고 폐기 반영은 최대 TTL 지연이다.
+- 완료 조건: relay build/lint, 실제 loopback Socket.IO 클라이언트의 read/write·위조·만료·갱신·재연결·다른 방/Origin/challenge 검사 및 legacy 하네스. 서버는 단일 프로세스/in-memory adapter 범위다. 전체 남용/연결 수 제한·공개 부하/배포·실제 Supabase 발급·브라우저 UI는 후속이다.
+- 빌드 호환: byte-identical Web Crypto 계약의 typed array iteration을 보존하려고 relay TypeScript target을 ES5에서 ES2020으로 변경한다. 기존 배포 런타임 Node 24 범위 안이며 dependency/lockfile 변경은 없다.
+
 ## D-025: relay 입장권 서명 계약
 
 - 결정 (2026-10-14): Web Crypto ECDSA P-256/SHA-256의 비대칭 서명을 사용한다. Edge 발급기만 private key를 보유하고 relay에는 public key만 둔다. 새로운 dependency 없이 플랫폼 crypto API를 사용하며 JWT로 위장하지 않는 고정 버전 envelope를 정의한다. 참고: https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/sign

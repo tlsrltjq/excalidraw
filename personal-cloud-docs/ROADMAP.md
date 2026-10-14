@@ -775,6 +775,8 @@ D-012 결정에 따라 구현했다 (구글 시트/문서 버전 기록을 단�
 
 ## Milestone 8: 공동편집 Persistence 독립
 
+2026-10-14 relay 단위: 별도 서버의 sc_ room 입장/갱신·read/write 검사, 소켓별 challenge, 60초 만료 종료, 수신자 필터와 공개 키 미설정 fail-closed를 구현했다(D-026). 기존 hex room 프로토콜은 유지한다. 프론트 입장/provider 연결, read-only UI, hosted DB/Edge/relay 배포 및 실기기 검증은 다음이다. 이 단위는 운영 활성화가 아니다.
+
 2026-10-14 입장권 기반: 고정 버전 ECDSA P-256 입장권 계약, verifier/issuer handler와 미배포 Edge entrypoint를 구현했다(D-025). 서명/위조/만료/room·Origin·challenge·scope 검사 및 요청 제한을 자동 확인했다. 다음은 별도 relay 저장소의 공개 키 검증/socket challenge/갱신/전송 권한 처리와 프론트 입장 연결이다. 아직 실시간 입장 보호가 적용된 운영 서비스는 아니다.
 
 2026-10-14 통합 adapter 단위: scene CAS/private 파일 factory와 socket별 실제 복원 scene version cache를 구현했다. controller/Portal operation snapshot 및 공유 FileManager reset generation으로 이전 방 응답/암호문/정리 작업이 새 방에 적용되지 않게 했다. Firebase 기본 provider와 새 방 잠금은 유지한다. 다음은 relay ticket/실제 입장 연결 및 읽기 전용 UI·broadcast 제한이며 운영 전환 전 메모리/rate/로그 제한도 남아 있다.

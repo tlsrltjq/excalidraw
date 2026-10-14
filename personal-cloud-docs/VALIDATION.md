@@ -1,5 +1,13 @@
 # MVP 검증 기록
 
+## 2026-10-14 relay socket 입장·갱신 연결
+
+- 변경: 별도 relay `src/index.ts`, 새 `src/admission.ts`/byte-identical `src/ticket.ts`, Node 24에 맞춘 ES2020/CommonJS tsconfig와 PERSONAL 가이드. 앱 저장소는 `check-room-admission.node-test.mjs`와 계획/운영/검증 문서만 변경했다. app controller/provider/core/dependency/lockfile/DB/Edge 함수/운영 키·Render/Vercel/무료 설정은 그대로다.
+- 서버 build/typecheck와 전체 server code lint, 변경 서버 코드 scoped formatting 통과. 앱 issuer/handler 31개도 재실행 통과. 새 실제 Socket.IO 하네스 11개와 같은 새 서버 바이너리의 기존 relay 하네스 7개 통과. signer/verifier 소스 byte parity를 확인했다. loopback 임시 포트만 사용하고 메모리에서 생성한 합성 키로 검사했으며 임시 서버/연결은 종료했다. 기존 3002 서버는 건드리지 않았다.
+- write 양방향 bytes 보존/read 수신, read reliable/volatile/follow 거부, write follow, 위조·만료·다른 Origin/socket/room/extra 입력·미참여 전송·legacy join 우회 거부, 다른 canvas/follow 격리, 동시 join 단일 방, 갱신/오래된 갱신 거부/write→read 즉시 다운그레이드, 실제 만료 timer 종료·새 socket challenge 재입장, private JWK import 거부/공개 키 누락 시 새 방 닫기·legacy 유지, 소켓별 검증 10회 제한을 확인했다. 만료 검사는 오래전에 발급된 유효 ticket을 사용해 실제 2~3초 대기했고 clock mock으로 대체하지 않았다. 이전 legacy 하네스는 실제 AES-GCM 전달/재접속/Origin·polling 검사도 포함한다.
+- 초기 ES2020 target 변경에서 module 기본값이 달라져 서버가 시작되지 않은 것을 CommonJS 명시로 수정해 실제 시작을 재확인했다. 하네스의 nested node test가 부모 NODE_TEST_CONTEXT를 상속하면 exit 0만으로 실제 실행을 확인할 수 없음을 발견해 해당 env를 제거하고 TAP tests/pass 7을 assert한 뒤 최종 재실행했다. Node의 .ts module type warning은 유지하며 root package type이나 dependency를 바꾸지 않았다. 가드레일(8개 변경 파일)/diff/scoped harness lint·format 통과. 서버 `d13e0c5`를 기능 브랜치에 커밋/push했으며 운영 Render Source는 변경하지 않았다.
+- 생략/한계: app 코드 변경이 없어 앱 전체 type/lint/build/full suite는 반복하지 않고 변경 Node 하네스 lint와 issuer 집중 검사를 실행했다. 공개/컨테이너/브라우저 두 계정·UI, 실제 Supabase 발급/DB·Edge·relay 배포, 네트워크 재시도/갱신 실패 UX는 미검증이다. read-only UI/provider 입장·계정 수명주기와 renewal timer는 다음 프론트 단위다. 전역/IP 연결 제한·전송량/메모리/공개 부하·로그·키 회전은 별도이며 per-socket verification 제한만으로 해결됐다고 판단하지 않는다. 현재 recipient lookup은 단일 프로세스 in-memory adapter 전제다. 이미 받은 bytes는 회수할 수 없고 초대 폐기 반영은 최대 60초 지연될 수 있다. 운영 변경/유료 옵션/새 방 UI 활성화는 하지 않았다.
+
 ## 2026-10-14 relay 입장권 기반
 
 - 변경: `supabase/functions/collab-ticket/{ticket,handler,index}.ts`, 미배포 function config, `collab/persistence/relayTicket.test.ts`와 README/ROADMAP/DECISIONS/협업 저장/operations/검증 문서. core/dependency/DB/기존 controller/provider/별도 relay 저장소/운영 서비스·키 설정은 변경하지 않았다. 새 방 gate를 유지한다.

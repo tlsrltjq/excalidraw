@@ -1,5 +1,9 @@
 # 자체 공동편집 서버
 
+## 2026-10-14 relay admission 구현
+
+서버 기능 브랜치 `codex/collab-relay-admission`에 새 sc_ room의 공개 키 입장 검증/socket challenge/갱신/만료 종료와 read/write 송수신·follow 제한을 구현했다. legacy hex room은 유지한다. 앱의 `check-room-admission.node-test.mjs`가 별도 loopback 임시 포트로 이 빌드의 서버를 시작하고 합성 키/클라이언트만 사용한 뒤 종료한다. 상세 프로토콜은 collaboration-persistence의 D-026 기록을 따른다. 공개 Render 서버는 기존 `e2defb1`을 유지하며 push는 배포가 아니다.
+
 최신 판정: 2026-10-13 운영 프론트 Source `d86d9e27`로 개인 relay 연결 완료. local/production build와 공개 endpoint 반영 확인. 운영 화면 자동 접근과 실제 sleep 뒤 브라우저 복구는 미검증이다. 아래 준비 당시 '미전환' 기록은 이 결과로 후속 처리한다.
 
 ## 2026-10-13 공개 서버 앱 연결 계획
