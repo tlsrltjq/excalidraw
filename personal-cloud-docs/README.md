@@ -15,6 +15,8 @@
 
 ## 지금 어디까지 왔나
 
+Milestone 8 입장 화면/controller 연결 (2026-10-14): `codex/collab-entry-integration`에서 선택→입장 ACK→Supabase scene 준비→캔버스 전환을 연결했다. 초기 실패/취소에는 기존 scene/files/개인 그림 연결을 보존하며 초기 peer 업데이트를 bounded queue로 병합한다. 재연결 병합·읽기 전용 잠금·저장/파일/포인터/follow 전송 방어와 종료 cleanup을 구현했다. **`VITE_COLLAB_SUPABASE_ENABLED`는 기본 off이며 운영에 켜지 않았다.** 다음은 사용자용 새 방 생성/초대 관리, 공개 활성화 전 용량·로그·rate 제한 및 hosted DB/Edge/relay 적용·두 실제 클라이언트 검증이다. 결과와 생략은 VALIDATION 최신 기록을 따른다.
+
 Milestone 8 프론트 세션 기반 (2026-10-14): `codex/collab-client-session`에서 입장권 요청 client와 ACK 이후 준비 완료되는 transport worker를 구현했다. 30초 전 갱신, read/write 상태, timeout/만료/visibility 복귀/재연결/stale 응답/정리를 처리하고 실제 loopback relay와 입장·갱신·read 다운그레이드를 확인했다. **아직 선택 화면/controller/provider에 연결하지 않았다.** 다음은 입장 ACK와 원격 scene 준비가 성공한 뒤 캔버스를 전환하고 실패 시 현재 scene을 보존하는 통합 단위다. 운영 배포/새 방 UI 잠금은 유지한다.
 
 Milestone 8 relay 입장 연결 (2026-10-14): 앱/서버의 `codex/collab-relay-admission`에서 새 방 공개 키 검증, socket challenge, join/renew ACK, 만료 종료와 read/write 송수신·follow 검사를 구현했다. 운영 Render에는 배포하지 않았고 프론트 입장/provider 연결은 아직 남아 있다. 기본 Firebase와 새 방 UI 잠금은 유지한다. 로컬 실행/검사 방법은 operations, 실제 결과와 한계는 VALIDATION을 따른다.

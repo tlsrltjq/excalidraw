@@ -143,8 +143,18 @@ HTTP handler는 exact Origin allowlist, POST/OPTIONS, strict 입력 allowlist, 4
 close는 owned socket을 종료하고 listener/timer/ACK promise/request signal을 정리한다. ticket은 세션 메모리에만 보관한다. scope 변경은 새 ACK 이후 callback으로 전달하며 callback 적용 동안 canWrite가 닫힌다. `getCollabParticipantClient`를 export해 이후 ticket/adapter가 같은 account 또는 분리된 guest client를 사용하도록 준비했다. 브라우저 시계가 서버와 크게 다르면 fail-closed로 초대를 거부할 수 있다.
 
 - [x] 프론트 ticket request/transport 세션 및 실제 loopback worker 입장·갱신 검사
-- [ ] 선택 화면/Collab/Portal에 실제 session/provider/read-only UI 연결
-- [ ] ACK 후 remote scene 준비·적용/기존 scene 보존 및 초기 원격 업데이트 경합 처리
-- [ ] 계정/route/stop 수명주기와 autosave·local-first 복귀 통합
+- [x] 선택 화면/Collab/Portal session/provider/read-only UI 연결 (기본 flag off, 운영 미적용)
+- [x] ACK 후 remote scene 준비·적용/기존 scene 보존 및 초기 peer queue 처리 (자동 검사)
+- [x] 계정/route/stop 수명주기와 autosave·local-first 복귀 통합 (자동 검사, 실기기 유효 초대 미검증)
 
 현재 새 모듈은 runtime 미연결이다. 기존 controller의 ACK 전 canvas 초기화/Firebase fallback을 새 방에서 재사용하지 않고 별도 통합 단위로 다룬다. 운영/기존 선택 화면은 그대로이며 이 단위는 사용자 입장 UI 완료가 아니다.
+
+### 선택 화면/controller 통합 (2026-10-14, D-028)
+
+위 미연결 기록은 당시 상태이며 이번 단위에서 flag-gated 경로를 연결했다. flag를 켠 환경의 선택 화면은 proof 확인 뒤 새 `startInvitation` API를 호출한다. legacy start/Firebase fallback은 사용하지 않는다. controller는 로컬 저장을 flush/pause하고 개인 Cloud autosave를 협업 잠금 상태로 둔 채 기존 scene/files를 유지한다. ACK 이후 provider snapshot read와 현재 socket/account/route/operation을 확인한 뒤 초기 scene을 적용한다. 적용 오류에는 원본 scene/files를 복구하고, 성공한 경우에만 개인 drawing/baseline을 분리한다.
+
+초기/재연결 peer packet은 직렬 복호화하며 최대 64개/8 MiB(queued+buffered)를 초과하면 실패한다. 초기 snapshot 뒤 buffered scene을 reconcile하고 재연결은 현재 scene과 remote를 병합해 로컬 미저장 변경을 버리지 않는다. provider는 connection epoch와 instance에 묶여 이전 연결의 scene/file 결과를 적용하지 않는다. 준비/재연결/read에는 controlled viewMode와 onChange 잠금 재확인을 사용한다. core resetScene이 viewMode를 초기화하는 경우도 잠금을 다시 적용한다.
+
+canWrite는 committed/not loading/write scope/session.canWrite를 모두 확인한다. scene 저장/파일 업로드/broadcast/포인터/follow는 이 경계를 거치며 read 종료에는 협업 저장 경고를 생략한다. 계정 변경/route/cancel/stop/unmount는 provider/worker/queue/listener를 정리한다. 성공한 scene은 개인 drawing에 autosave하지 않으며 종료 후 익명 local-first로 돌아간다. 종료 전에 아직 다운로드되지 않은 이미지의 완전한 로컬 복사까지 보장하는 것은 아니다. 협업 저장 중단 직전 flush 완료/단절 후 collaborative local draft 복구는 별도 잔여 위험이다.
+
+이 경로는 기본 off인 `VITE_COLLAB_SUPABASE_ENABLED=true` opt-in으로만 사용한다. 운영 flag/DB/Edge/relay/키는 미적용이며 새 방 생성/초대 관리 UI도 아직 없다. 공개 활성화 전 rate·총 용량/inflate 상한/인프라 로그 정책과 실제 두 클라이언트/Storage/reload를 확인한다. lazy provider/session/request chunks도 PWA precache에 포함했고 main 한도를 2.4 MiB로 최소 상향했다.

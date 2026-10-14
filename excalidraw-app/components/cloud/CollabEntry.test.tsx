@@ -8,6 +8,9 @@ import {
 } from "@testing-library/react";
 import { StrictMode } from "react";
 
+import { appJotaiStore, Provider } from "../../app-jotai";
+import { inviteConnectionAtom } from "../../collab/persistence/inviteState";
+
 import { CollabEntry } from "./CollabEntry";
 
 const mocks = vi.hoisted(() => ({
@@ -42,6 +45,8 @@ vi.mock("@excalidraw/excalidraw/components/Dialog", () => ({
 const path =
   "/?collabStorage=supabase&invite=00000000-0000-4000-8000-000000000001#room=sc_aaaaaaaaaaaaaaaaaaaa,AAAAAAAAAAAAAAAAAAAAAA";
 beforeEach(() => {
+  vi.stubEnv("VITE_COLLAB_SUPABASE_ENABLED", "false");
+  appJotaiStore.set(inviteConnectionAtom, null);
   vi.clearAllMocks();
   mocks.session.status = "signed-out";
   mocks.session.session = null;
@@ -52,6 +57,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  vi.unstubAllEnvs();
+  appJotaiStore.set(inviteConnectionAtom, null);
   history.replaceState({}, "", "/");
   sessionStorage.clear();
 });
@@ -173,4 +180,46 @@ it("restores a valid one-time OAuth return after session restoration", async () 
   expect(location.hash).toContain("#room=sc_");
   expect(sessionStorage.getItem("personal-cloud:invite-return:v1")).toBeNull();
   expect(mocks.check).not.toHaveBeenCalled();
+});
+it("enabled entry connects and closes the chooser only after committed admission", async () => {
+  vi.stubEnv("VITE_COLLAB_SUPABASE_ENABLED", "true");
+  const api = {
+    startInvitation: vi.fn(async () => {
+      appJotaiStore.set(inviteConnectionAtom, location.href);
+    }),
+    cancelInvitationConnection: vi.fn(),
+  };
+  render(
+    <Provider store={appJotaiStore}>
+      <CollabEntry collabAPI={api} />
+    </Provider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "게스트로 참여" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(api.startInvitation).toHaveBeenCalledWith(
+    "guest",
+    expect.any(Function),
+  );
+});
+it("enabled entry retries a failed room admission without treating proof as connection", async () => {
+  vi.stubEnv("VITE_COLLAB_SUPABASE_ENABLED", "true");
+  const api = {
+    startInvitation: vi
+      .fn()
+      .mockRejectedValueOnce(new Error("입장 준비 실패"))
+      .mockImplementation(async () => {
+        appJotaiStore.set(inviteConnectionAtom, location.href);
+      }),
+    cancelInvitationConnection: vi.fn(),
+  };
+  render(
+    <Provider store={appJotaiStore}>
+      <CollabEntry collabAPI={api} />
+    </Provider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "게스트로 참여" }));
+  await screen.findByText("입장 준비 실패");
+  fireEvent.click(screen.getByRole("button", { name: "게스트로 참여" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(api.startInvitation).toHaveBeenCalledTimes(2);
 });

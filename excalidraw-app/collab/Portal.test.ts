@@ -16,6 +16,7 @@ afterEach(() => encryption.mockReset());
 const setup = () => {
   let generation = 0;
   const collab = {
+    canWrite: () => true,
     captureRoomOperation: () => {
       const captured = generation;
       return () => captured === generation;

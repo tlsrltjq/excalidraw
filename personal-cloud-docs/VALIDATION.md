@@ -1,5 +1,15 @@
 # MVP 검증 기록
 
+## 2026-10-14 선택 화면/controller 통합
+
+- 변경: `App.tsx`의 viewMode prop/onChange 잠금, `Collab.tsx`의 새 startInvitation/provider/epoch/scene queue/rollback·cleanup, Portal의 joinLegacy 및 canWrite 가드, inviteState atom, 선택 UI/test, 실제 편집기 `collabInvitation.test.tsx`, 공개 env 타입, app Vite precache limit 및 계획/운영 문서. core/dependency/lockfile/DB/Edge/relay/운영 설정은 변경하지 않았다. `VITE_COLLAB_SUPABASE_ENABLED`는 기본 off다.
+- 집중 검사 232개/21파일 통과. 새 실제 편집기 검사 12개는 ACK 전/늦은 snapshot 원본 유지, 취소 시 개인 drawing 유지, snapshot 오류/Firebase fallback 금지, read-only editor/save/broadcast/종료 경고, 실제 AES-GCM 초기 peer buffer 병합, account change stale 차단, reconnect local/remote 병합 및 provider epoch 무효화, stop 취소·local 복귀, write Supabase 선택/read downgrade, 초기 apply 실패의 scene/binary rollback, queue 64개 상한을 확인했다. 선택 UI 추가 2개는 opt-in 성공 후 chooser 닫기 및 입장 실패 재시도다. backend/Socket/worker callback은 mock이며 실제 편집기와 crypto/restore/reconcile는 사용한다.
+- 마지막 follow/idle cleanup 보완 후 집중 26개, 전체 `yarn test:app --watch=false` 147파일/2,115 passed/47 skipped/1 todo 통과. 타입/전체 code lint와 scoped lint/최종 build 통과. 실제 loopback relay admission 하네스 12개 및 nested legacy 7개도 재실행했다. 이 하네스는 relay+session worker이며 전체 App/Supabase HTTP를 두 브라우저에 연결한 검사는 아니다.
+- 실제 core resetScene이 read viewMode를 false로 초기화하는 실패를 재현해 prop만으로 충분하지 않음을 확인했다. onReady/onChange에서 잠금을 다시 적용한 뒤 통과했다. mock UI가 app store Provider 없이 렌더돼 chooser가 닫히지 않던 fixture를 실제 App과 같은 Provider로 맞췄다. nullable follow target/MIME fixture 타입 오류도 수정했다. 구버전 서명·시간/순서 검사 및 Cloud autosave/초안/URL 회귀를 함께 실행했다.
+- 최초 PWA build는 static main 2.43 MB로 기존 precache 한도를 초과했다. provider/session/request를 lazy import한 뒤 main 약 2,412.20 kB로 낮췄으나 기존 2.3 MiB보다 약 0.5 kB 커서 2.4 MiB로 최소 상향했다. 최종 build는 precache 62 entries 성공이며 생성된 SW의 main/lazy provider/session/request 포함을 확인했다. PWA 비활성화/캐시 제외는 하지 않았고 실제 browser offline 설치 검사는 생략했다. build와 동시 typecheck의 삭제된 임시 Vite config TS6053은 순차 실행으로 해소했다. 기존 Firebase config/MetaProperty/font/chunk/Browserslist/Node/parser 경고는 유지한다.
+- Safari: 기존 사용자 탭과 별개인 `127.0.0.1:3005` opt-in 임시 탭/합성 초대에서 로그인·게스트 버튼, guest 확인 중 비활성화, 실패 안내/버튼 재활성화, 닫기 후 query/hash 제거·기본 캔버스 복귀를 확인했다. 화면에서 잘림/겹침은 관찰하지 않았다. 운영 RPC 미적용/합성 초대이므로 실패 원인이나 실제 valid invite 성공을 이 UI 관찰로 확정하지 않는다. 오류 화면을 `/tmp/personal-excalidraw-entry-safari.png`에 기록했고 임시 탭/3005 서버를 종료해 기존 3001 탭으로 돌아왔다. 실제 사용자 scene/key/Cloud 쓰기·삭제/로그인·서버 설정 변경은 없다.
+- 생략/남은 위험: hosted Supabase migration/Edge/key/Render/Vercel 활성화, 실제 두 계정/guest HTTP 및 두 브라우저/모바일/Storage·다른 기기·reload·offline·JWT expiry·Render cold start, 새 방 생성/초대 관리 UI. 종료 직전 collaborative save flush 완료, 아직 미다운로드 이미지의 완전한 local 복사/단절 후 collaborative local draft 복구도 보장하지 않는다. 공개 rate/총 용량/inflate 메모리 상한/인프라 로그/키 회전은 적용 전 완료해야 한다. 기존 Firebase URL 및 새 방 기본 off를 유지하며 무료 설정과 운영 데이터는 그대로다. 변경 코드 format/diff/guardrails(16개 파일) 통과 후 기능 브랜치에 커밋한다.
+
 ## 2026-10-14 프론트 admission 세션 기반
 
 - 변경: `collab/persistence/relayTicketRequest.ts`/test, `relaySession.ts`/test, 선택한 account/guest client를 반환하도록 기존 admission helper export, 실제 relay 하네스 worker 검사와 README/ROADMAP/DECISIONS/협업 저장/operations/검증 문서. controller/Portal/App/선택 UI/core/dependency/DB/Edge/별도 서버 소스/운영 설정은 변경하지 않았다. runtime provider는 Firebase, 새 방 UI는 잠금 상태다.

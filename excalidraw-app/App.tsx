@@ -106,6 +106,7 @@ import { VersionHistory } from "./components/cloud/VersionHistory";
 import { CloudSaveStatus } from "./components/cloud/CloudSaveStatus";
 import { CollabEntry } from "./components/cloud/CollabEntry";
 import { needsCollabEntry } from "./collab/persistence/entryRoute";
+import { inviteViewModeAtom } from "./collab/persistence/inviteState";
 import {
   flushAutosave,
   getCurrentFileManager,
@@ -423,6 +424,7 @@ const ExcalidrawWrapper = () => {
 
   const [, setShareDialogState] = useAtom(shareDialogStateAtom);
   const [collabAPI] = useAtom(collabAPIAtom);
+  const inviteViewMode = useAtomValue(inviteViewModeAtom);
   const [isCollaborating] = useAtomWithInitialValue(isCollaboratingAtom, () => {
     return (
       !needsCollabEntry(window.location.href) &&
@@ -766,6 +768,16 @@ const ExcalidrawWrapper = () => {
     appState: AppState,
     files: BinaryFiles,
   ) => {
+    if (
+      appJotaiStore.get(inviteViewModeAtom) === true &&
+      !appState.viewModeEnabled
+    ) {
+      excalidrawAPI?.updateScene({
+        appState: { viewModeEnabled: true },
+        captureUpdate: CaptureUpdateAction.NEVER,
+      });
+      return;
+    }
     if (collabAPI?.isCollaborating()) {
       collabAPI.syncElements(elements);
     }
@@ -1009,6 +1021,7 @@ const ExcalidrawWrapper = () => {
         onExport={onExport}
         initialData={initialStatePromiseRef.current.promise}
         isCollaborating={isCollaborating}
+        viewModeEnabled={inviteViewMode ?? undefined}
         onPointerUpdate={collabAPI?.onPointerUpdate}
         UIOptions={{
           canvasActions: {
@@ -1141,7 +1154,7 @@ const ExcalidrawWrapper = () => {
         )}
 
         <Dashboard excalidrawAPI={excalidrawAPI} />
-        {!isCollabDisabled && <CollabEntry />}
+        {!isCollabDisabled && <CollabEntry collabAPI={collabAPI} />}
         <VersionHistory excalidrawAPI={excalidrawAPI} />
         <CloudSaveStatus excalidrawAPI={excalidrawAPI} />
 

@@ -223,7 +223,7 @@ export default defineConfig(({ mode }) => {
               },
             },
           ],
-          maximumFileSizeToCacheInBytes: 2.3 * 1024 ** 2, // 2.3MB
+          maximumFileSizeToCacheInBytes: 2.4 * 1024 ** 2, // 2.4 MiB
         },
         manifest: {
           short_name: "Excalidraw",

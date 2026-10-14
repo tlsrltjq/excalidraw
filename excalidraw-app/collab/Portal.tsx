@@ -34,15 +34,20 @@ class Portal {
     this.collab = collab;
   }
 
-  open(socket: Socket, id: string, key: string) {
+  open(
+    socket: Socket,
+    id: string,
+    key: string,
+    options?: { isCurrent(): boolean; joinLegacy: boolean },
+  ) {
     this.socket = socket;
     this.roomId = id;
     this.roomKey = key;
-    const current = this.collab.captureRoomOperation();
+    const current = options?.isCurrent ?? this.collab.captureRoomOperation();
 
     // Initialize socket listeners
     this.socket.on("init-room", () => {
-      if (current() && this.socket) {
+      if (current() && this.socket && (options?.joinLegacy ?? true)) {
         this.socket.emit("join-room", this.roomId);
         trackEvent("share", "room joined");
       }
@@ -71,7 +76,11 @@ class Portal {
     if (!this.socket) {
       return;
     }
-    this.queueFileUpload.flush();
+    if (this.collab.canWrite()) {
+      this.queueFileUpload.flush();
+    } else {
+      this.queueFileUpload.cancel();
+    }
     this.socket.close();
     this.socket = null;
     this.roomId = null;
@@ -95,11 +104,11 @@ class Portal {
     roomId?: string,
   ) {
     const current = this.collab.captureRoomOperation();
-    if (this.isOpen()) {
+    if (this.isOpen() && this.collab.canWrite()) {
       const json = JSON.stringify(data);
       const encoded = new TextEncoder().encode(json);
       const { encryptedBuffer, iv } = await encryptData(this.roomKey!, encoded);
-      if (!current()) {
+      if (!current() || !this.collab.canWrite()) {
         return;
       }
 
@@ -113,6 +122,9 @@ class Portal {
   }
 
   queueFileUpload = throttle(async () => {
+    if (!this.collab.canWrite()) {
+      return;
+    }
     const current = this.collab.captureRoomOperation();
     try {
       await this.collab.fileManager.saveFiles({
@@ -163,6 +175,9 @@ class Portal {
     elements: readonly OrderedExcalidrawElement[],
     syncAll: boolean,
   ) => {
+    if (!this.collab.canWrite()) {
+      return;
+    }
     if (updateType === WS_SUBTYPES.INIT && !syncAll) {
       throw new Error("syncAll must be true when sending SCENE.INIT");
     }
@@ -267,7 +282,7 @@ class Portal {
   };
 
   broadcastUserFollowed = (payload: OnUserFollowedPayload) => {
-    if (this.socket?.id) {
+    if (this.socket?.id && this.collab.canWrite()) {
       this.socket.emit(WS_EVENTS.USER_FOLLOW_CHANGE, payload);
     }
   };

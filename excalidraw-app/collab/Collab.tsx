@@ -80,11 +80,28 @@ import {
   saveUsernameToLocalStorage,
 } from "../data/localStorage";
 import { resetBrowserStateVersions } from "../data/tabSync";
+import { cloudSessionAtom } from "../cloud/session";
+import { clearAutosaveBaseline } from "../cloud/autosave";
+import { setCurrentDrawing } from "../cloud/currentDrawing";
+import { setDrawingIdInUrl } from "../cloud/urlDrawingId";
 
 import { collabErrorIndicatorAtom } from "./CollabError";
 import Portal from "./Portal";
 import { collabPersistence } from "./persistence";
 import { needsCollabEntry } from "./persistence/entryRoute";
+import { leaveCollabEntry } from "./persistence/entryRoute";
+import { getCollabParticipantClient } from "./persistence/admission";
+import { parseCollabPersistenceRoute } from "./persistence/invites";
+
+import {
+  inviteConnectionAtom,
+  inviteViewModeAtom,
+  isSupabaseCollabEnabled,
+} from "./persistence/inviteState";
+
+import type { createRelaySession } from "./persistence/relaySession";
+
+import type { ParticipationMode } from "./persistence/admission";
 
 import type { CollabPersistence } from "./persistence/types";
 
@@ -115,6 +132,8 @@ export interface CollabAPI {
   isCollaborating: () => boolean;
   onPointerUpdate: CollabInstance["onPointerUpdate"];
   startCollaboration: CollabInstance["startCollaboration"];
+  startInvitation: CollabInstance["startInvitation"];
+  cancelInvitationConnection: CollabInstance["cancelInvitationConnection"];
   stopCollaboration: CollabInstance["stopCollaboration"];
   syncElements: CollabInstance["syncElements"];
   fetchImageFilesFromFirebase: CollabInstance["fetchImageFilesFromFirebase"];
@@ -141,6 +160,35 @@ class Collab extends PureComponent<CollabProps, CollabState> {
   private collaborators = new Map<SocketId, Collaborator>();
   private persistence: CollabPersistence = collabPersistence;
   private roomGeneration = 0;
+  private secureRoom: {
+    committed: boolean;
+    scope: "read" | "write" | null;
+    route: string;
+    viewModeBefore: boolean;
+    loading: boolean;
+    epoch: number;
+    messages: readonly RemoteExcalidrawElement[][];
+    incoming: Promise<void>;
+    bytes: number;
+    bufferBytes: number;
+    count: number;
+    worker: ReturnType<typeof createRelaySession> | null;
+    cleanup(): void;
+    reject(error: Error): void;
+  } | null = null;
+
+  canWrite = () =>
+    !this.secureRoom ||
+    (this.secureRoom.committed &&
+      this.secureRoom.scope === "write" &&
+      !this.secureRoom.loading &&
+      !!this.secureRoom.worker?.canWrite());
+
+  cancelInvitationConnection = () => {
+    if (this.secureRoom && !this.secureRoom.committed) {
+      this.destroySocketClient();
+    }
+  };
 
   captureRoomOperation = () => {
     const { roomId, roomKey, socket } = this.portal;
@@ -266,6 +314,8 @@ class Collab extends PureComponent<CollabProps, CollabState> {
       isCollaborating: this.isCollaborating,
       onPointerUpdate: this.onPointerUpdate,
       startCollaboration: this.startCollaboration,
+      startInvitation: this.startInvitation,
+      cancelInvitationConnection: this.cancelInvitationConnection,
       syncElements: this.syncElements,
       fetchImageFilesFromFirebase: this.fetchImageFilesFromFirebase,
       stopCollaboration: this.stopCollaboration,
@@ -294,6 +344,9 @@ class Collab extends PureComponent<CollabProps, CollabState> {
   };
 
   componentWillUnmount() {
+    if (this.secureRoom) {
+      this.destroySocketClient({ isUnload: true });
+    }
     this.roomGeneration++;
     window.removeEventListener("online", this.onOfflineStatusToggle);
     window.removeEventListener("offline", this.onOfflineStatusToggle);
@@ -326,6 +379,12 @@ class Collab extends PureComponent<CollabProps, CollabState> {
   };
 
   private beforeUnload = withBatchedUpdates((event: BeforeUnloadEvent) => {
+    if (
+      this.secureRoom &&
+      (!this.secureRoom.committed || this.secureRoom.scope === "read")
+    ) {
+      return;
+    }
     const syncableElements = getSyncableElements(
       this.getSceneElementsIncludingDeleted(),
     );
@@ -352,6 +411,9 @@ class Collab extends PureComponent<CollabProps, CollabState> {
   saveCollabRoomToFirebase = async (
     syncableElements: readonly SyncableExcalidrawElement[],
   ) => {
+    if (!this.canWrite()) {
+      return;
+    }
     const current = this.captureRoomOperation();
     syncableElements = cloneJSON(syncableElements);
     try {
@@ -399,6 +461,19 @@ class Collab extends PureComponent<CollabProps, CollabState> {
   };
 
   stopCollaboration = (keepRemoteState = true) => {
+    if (this.secureRoom) {
+      if (
+        keepRemoteState &&
+        !window.confirm(t("alerts.collabStopOverridePrompt"))
+      ) {
+        return;
+      }
+      this.destroySocketClient();
+      if (keepRemoteState) {
+        leaveCollabEntry();
+      }
+      return;
+    }
     this.queueBroadcastAllElements.cancel();
     this.queueSaveToFirebase.cancel();
     this.loadImageFiles.cancel();
@@ -448,6 +523,25 @@ class Collab extends PureComponent<CollabProps, CollabState> {
 
   private destroySocketClient = (opts?: { isUnload: boolean }) => {
     this.roomGeneration++;
+    const previousViewMode = this.secureRoom?.viewModeBefore;
+    const copiedSecureScene = this.secureRoom?.committed;
+    if (this.secureRoom) {
+      const room = this.secureRoom;
+      room.worker?.close();
+      room.cleanup();
+      room.reject(new AbortError());
+      this.queueBroadcastAllElements.cancel();
+      this.queueSaveToFirebase.cancel();
+      this.loadImageFiles.cancel();
+      this.portal.queueFileUpload.cancel();
+      this.secureRoom = null;
+      this.persistence = collabPersistence;
+      if (copiedSecureScene) {
+        LocalData.fileStorage.reset();
+      }
+      appJotaiStore.set(inviteConnectionAtom, null);
+      appJotaiStore.set(inviteViewModeAtom, null);
+    }
     this.lastBroadcastedOrReceivedSceneVersion = -1;
     this.portal.close();
     this.fileManager.reset();
@@ -461,6 +555,21 @@ class Collab extends PureComponent<CollabProps, CollabState> {
         collaborators: this.collaborators,
       });
       LocalData.resumeSave("collaboration");
+      if (previousViewMode !== undefined) {
+        this.excalidrawAPI.updateScene({
+          ...(copiedSecureScene
+            ? {
+                elements: this.getSceneElementsIncludingDeleted().map(
+                  (element) =>
+                    isImageElement(element) && element.status === "saved"
+                      ? newElementWith(element, { status: "pending" })
+                      : element,
+                ),
+              }
+            : {}),
+          appState: { viewModeEnabled: previousViewMode },
+        });
+      }
     }
   };
 
@@ -514,6 +623,354 @@ class Collab extends PureComponent<CollabProps, CollabState> {
   };
 
   private fallbackInitializationHandler: null | (() => any) = null;
+
+  startInvitation = async (
+    mode: ParticipationMode,
+    entryCurrent: () => boolean,
+  ) => {
+    if (!isSupabaseCollabEnabled()) {
+      throw new Error("새 협업 방 연결을 아직 사용할 수 없습니다.");
+    }
+    const route = window.location.href;
+    const invite = parseCollabPersistenceRoute(route);
+    if (invite.provider !== "supabase" || this.portal.socket) {
+      throw new Error("협업 입장을 시작할 수 없습니다.");
+    }
+    const account = appJotaiStore.get(cloudSessionAtom);
+    if (mode === "account" && account.status !== "signed-in") {
+      throw new Error("로그인 상태를 확인하고 다시 참여하세요.");
+    }
+    const accountId = account.session?.user.id;
+    const client = getCollabParticipantClient(mode);
+    const [
+      { default: socketIOClient },
+      { createSupabaseCollabPersistence },
+      { createRelaySession },
+      { createRelayTicketRequest },
+    ] = await Promise.all([
+      import("socket.io-client"),
+      import("./persistence/supabase"),
+      import("./persistence/relaySession"),
+      import("./persistence/relayTicketRequest"),
+    ]);
+    if (
+      !entryCurrent() ||
+      window.location.href !== route ||
+      this.portal.socket
+    ) {
+      throw new AbortError();
+    }
+    const socket = socketIOClient(import.meta.env.VITE_APP_WS_SERVER_URL, {
+      autoConnect: false,
+      transports: ["websocket", "polling"],
+    });
+    let resolve!: () => void;
+    let reject!: (error: Error) => void;
+    const completion = new Promise<void>((done, failed) => {
+      resolve = done;
+      reject = failed;
+    });
+    const room: NonNullable<Collab["secureRoom"]> = {
+      committed: false,
+      scope: null,
+      route,
+      viewModeBefore: this.excalidrawAPI.getAppState().viewModeEnabled,
+      loading: true,
+      epoch: 0,
+      messages: [],
+      incoming: Promise.resolve(),
+      bytes: 0,
+      bufferBytes: 0,
+      count: 0,
+      worker: null,
+      cleanup: () => {},
+      reject,
+    };
+    this.roomGeneration++;
+    this.secureRoom = room;
+    const current = () =>
+      this.secureRoom === room &&
+      (room.committed || entryCurrent()) &&
+      window.location.href === room.route &&
+      appJotaiStore.get(cloudSessionAtom).session?.user.id === accountId;
+    const fail = (message: string) => {
+      if (this.secureRoom !== room) {
+        return;
+      }
+      const committed = room.committed;
+      reject(new Error(message));
+      this.destroySocketClient();
+      if (committed) {
+        this.setErrorDialog(message);
+      }
+    };
+    const cancelStale = () => {
+      if (this.secureRoom === room && !current()) {
+        this.destroySocketClient();
+      }
+    };
+    const unsubscribe = appJotaiStore.sub(cloudSessionAtom, cancelStale);
+    const events = ["hashchange", "popstate", "personal-collab-route-change"];
+    events.forEach((event) => window.addEventListener(event, cancelStale));
+    room.cleanup = () => {
+      unsubscribe();
+      events.forEach((event) => window.removeEventListener(event, cancelStale));
+      socket.off("client-broadcast", receive);
+      socket.off(WS_EVENTS.USER_FOLLOW_ROOM_CHANGE, followChange);
+      document.removeEventListener(EVENT.POINTER_MOVE, this.onPointerMove);
+      document.removeEventListener(
+        EVENT.VISIBILITY_CHANGE,
+        this.onVisibilityChange,
+      );
+      if (this.activeIntervalId) {
+        clearInterval(this.activeIntervalId);
+        this.activeIntervalId = null;
+      }
+      if (this.idleTimeoutId) {
+        clearTimeout(this.idleTimeoutId);
+        this.idleTimeoutId = null;
+      }
+    };
+    LocalData.flushSave();
+    LocalData.pauseSave("collaboration");
+    this.setIsCollaborating(true);
+    appJotaiStore.set(inviteViewModeAtom, true);
+    this.fileManager.reset();
+    this.portal.open(socket, invite.roomId, invite.roomKey, {
+      isCurrent: current,
+      joinLegacy: false,
+    });
+    const receive = (
+      encryptedData: ArrayBuffer,
+      iv: Uint8Array<ArrayBuffer>,
+    ) => {
+      const epoch = room.epoch;
+      const socketId = socket.id;
+      if (
+        !current() ||
+        ++room.count + room.messages.length > 64 ||
+        (room.bytes += encryptedData.byteLength) + room.bufferBytes >
+          8 * 1024 * 1024
+      ) {
+        fail("협업 초기 데이터를 처리하지 못했습니다. 다시 참여하세요.");
+        return;
+      }
+      room.incoming = room.incoming
+        .then(async () => {
+          if (!current() || epoch !== room.epoch || socket.id !== socketId) {
+            return;
+          }
+          const bytes = await decryptData(iv, encryptedData, invite.roomKey);
+          if (!current() || epoch !== room.epoch || socket.id !== socketId) {
+            return;
+          }
+          const data = JSON.parse(new TextDecoder().decode(bytes));
+          room.bytes -= encryptedData.byteLength;
+          room.count--;
+          if (
+            data.type === WS_SUBTYPES.INIT ||
+            data.type === WS_SUBTYPES.UPDATE
+          ) {
+            if (!Array.isArray(data.payload?.elements)) {
+              throw new Error("Invalid scene");
+            }
+            const elements = toBrandedType<readonly RemoteExcalidrawElement[]>(
+              data.payload.elements,
+            );
+            if (room.loading) {
+              room.bufferBytes += encryptedData.byteLength;
+              room.messages = [...room.messages, [...elements]];
+              return;
+            }
+            this.handleRemoteSceneUpdate(this._reconcileElements(elements));
+          } else if (
+            room.committed &&
+            !room.loading &&
+            data.payload?.socketId
+          ) {
+            if (data.type === WS_SUBTYPES.MOUSE_LOCATION) {
+              const { pointer, button, username, selectedElementIds } =
+                data.payload;
+              this.updateCollaborator(data.payload.socketId, {
+                pointer,
+                button,
+                username,
+                selectedElementIds,
+              });
+            } else if (data.type === WS_SUBTYPES.IDLE_STATUS) {
+              const { userState, username } = data.payload;
+              this.updateCollaborator(data.payload.socketId, {
+                userState,
+                username,
+              });
+            } else if (data.type === WS_SUBTYPES.USER_VISIBLE_SCENE_BOUNDS) {
+              const target = appJotaiStore.get(userToFollowAtom);
+              if (
+                target &&
+                target.socketId === data.payload.socketId &&
+                !this.followedBy.has(target.socketId)
+              ) {
+                this.excalidrawAPI.updateScene({
+                  appState: zoomToFitBounds({
+                    appState: this.excalidrawAPI.getAppState(),
+                    bounds: data.payload.sceneBounds,
+                    fit: "contain",
+                  }).appState,
+                });
+              }
+            }
+          }
+        })
+        .catch(() => {
+          if (current()) {
+            fail("협업 데이터를 확인하지 못했습니다. 다시 참여하세요.");
+          }
+        });
+    };
+    socket.on("client-broadcast", receive);
+    const followChange = (followers: SocketId[]) => {
+      if (current() && this.canWrite()) {
+        this.followedBy = new Set(followers);
+        this.relayVisibleSceneBounds({ force: true });
+      }
+    };
+    socket.on(WS_EVENTS.USER_FOLLOW_ROOM_CHANGE, followChange);
+    room.worker = createRelaySession({
+      socket,
+      roomId: invite.roomId,
+      isCurrent: current,
+      requestTicket: createRelayTicketRequest(
+        client,
+        invite,
+        window.location.origin,
+      ),
+      onPending: () => {
+        if (!current()) {
+          return;
+        }
+        room.epoch++;
+        room.loading = true;
+        room.messages = [];
+        room.bytes = 0;
+        room.bufferBytes = 0;
+        room.count = 0;
+        this.portal.socketInitialized = false;
+        this.portal.broadcastedElementVersions.clear();
+        this.fileManager.reset();
+        appJotaiStore.set(inviteViewModeAtom, true);
+      },
+      onReady: async (scope, preparationCurrent) => {
+        if (!current() || !preparationCurrent()) {
+          throw new AbortError();
+        }
+        if (scope !== room.scope || room.loading) {
+          const providerEpoch = room.epoch;
+          const provider: CollabPersistence = createSupabaseCollabPersistence({
+            client,
+            invite,
+            scope,
+            isCurrent: () =>
+              current() &&
+              room.epoch === providerEpoch &&
+              this.persistence === provider,
+          });
+          this.persistence = provider;
+          room.scope = scope;
+          if (scope === "read") {
+            appJotaiStore.set(userToFollowAtom, null);
+          }
+          this.fileManager.reset();
+        }
+        if (room.loading) {
+          const elements = await this.persistence.loadScene(
+            invite.roomId,
+            invite.roomKey,
+            socket,
+          );
+          await room.incoming;
+          if (!current() || !preparationCurrent()) {
+            throw new AbortError();
+          }
+          if (!room.committed) {
+            const original = {
+              elements: this.getSceneElementsIncludingDeleted(),
+              files: { ...this.excalidrawAPI.getFiles() },
+              appState: this.excalidrawAPI.getAppState(),
+            };
+            try {
+              this.excalidrawAPI.resetScene();
+              this.excalidrawAPI.updateScene({
+                elements: elements ?? [],
+                captureUpdate: CaptureUpdateAction.NEVER,
+              });
+              for (const message of room.messages) {
+                this.handleRemoteSceneUpdate(this._reconcileElements(message));
+              }
+            } catch (error) {
+              this.excalidrawAPI.resetScene();
+              this.excalidrawAPI.addFiles(Object.values(original.files));
+              this.excalidrawAPI.updateScene({
+                elements: original.elements,
+                appState: original.appState,
+                captureUpdate: CaptureUpdateAction.NEVER,
+              });
+              throw error;
+            }
+            // Cloud autosave remains paused until the original drawing is detached.
+            clearAutosaveBaseline();
+            setCurrentDrawing(null);
+            setDrawingIdInUrl(null, { replace: true });
+            room.route = window.location.href;
+          } else if (elements) {
+            this.handleRemoteSceneUpdate(
+              this._reconcileElements(
+                toBrandedType<readonly RemoteExcalidrawElement[]>(elements),
+              ),
+            );
+          }
+          if (room.committed) {
+            for (const message of room.messages) {
+              this.handleRemoteSceneUpdate(this._reconcileElements(message));
+            }
+          }
+          room.messages = [];
+          room.bufferBytes = 0;
+          room.loading = false;
+          if (!room.committed) {
+            this.initializeIdleDetector();
+          }
+          room.committed = true;
+          this.portal.socketInitialized = true;
+          this.setLastBroadcastedOrReceivedSceneVersion(
+            getSceneVersion(this.getSceneElementsIncludingDeleted()),
+          );
+          this.setActiveRoomLink(room.route);
+          appJotaiStore.set(inviteConnectionAtom, room.route);
+          window.dispatchEvent(new Event("personal-collab-route-change"));
+          this.loadImageFiles();
+        }
+        appJotaiStore.set(inviteViewModeAtom, scope === "read");
+        this.excalidrawAPI.updateScene({
+          appState: { viewModeEnabled: scope === "read" },
+          captureUpdate: CaptureUpdateAction.NEVER,
+        });
+        resolve();
+        setTimeout(() => {
+          if (current() && this.canWrite()) {
+            void this.portal.broadcastScene(
+              WS_SUBTYPES.UPDATE,
+              this.getSceneElementsIncludingDeleted(),
+              true,
+            );
+            this.queueSaveToFirebase();
+          }
+        }, 0);
+      },
+      onError: fail,
+    });
+    socket.connect();
+    return completion;
+  };
 
   startCollaboration = async (
     existingRoomLinkData: null | { roomId: string; roomKey: string },
@@ -1045,6 +1502,9 @@ class Collab extends PureComponent<CollabProps, CollabState> {
   };
 
   syncElements = (elements: readonly OrderedExcalidrawElement[]) => {
+    if (!this.canWrite()) {
+      return;
+    }
     this.broadcastElements(elements);
     this.queueSaveToFirebase();
   };
@@ -1078,6 +1538,9 @@ class Collab extends PureComponent<CollabProps, CollabState> {
   );
 
   setUserToFollow = (userToFollow: UserToFollow | null) => {
+    if (this.secureRoom && !this.canWrite() && userToFollow) {
+      return;
+    }
     const prev = appJotaiStore.get(userToFollowAtom) ?? null;
 
     if (prev?.socketId !== userToFollow?.socketId && this.portal.socket) {

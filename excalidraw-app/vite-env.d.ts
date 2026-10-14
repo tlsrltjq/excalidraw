@@ -43,6 +43,7 @@ interface ImportMetaEnv {
   // existing anonymous local-first flow (see DECISIONS.md D-004).
   VITE_SUPABASE_URL?: string;
   VITE_SUPABASE_PUBLISHABLE_KEY?: string;
+  VITE_COLLAB_SUPABASE_ENABLED?: string;
 
   MODE: string;
 

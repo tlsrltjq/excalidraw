@@ -1,5 +1,14 @@
 # 설계 결정 기록
 
+## D-028: 선택 화면과 Supabase room controller 연결
+
+- 범위 (2026-10-14): 기본 off인 공개 `VITE_COLLAB_SUPABASE_ENABLED` flag 아래 새 입장 API/선택 화면/Portal/session/provider를 연결한다. legacy startCollaboration/Firebase fallback은 새 방에서 호출하지 않는다. 운영 env/DB/Edge/Render는 변경하지 않는다.
+- ACK 후 scene read가 성공하고 current room/socket/account/route/generation을 재확인한 뒤 초기 캔버스를 전환한다. 초기 실패/취소에는 기존 scene/files/Cloud baseline을 유지한다. 준비 중 peer scene은 직렬 복호화/최대 64개·8 MiB 제한 queue에 보관해 snapshot 적용 후 reconcile한다. reconnect는 기존 scene과 원격을 reconcile해 미저장 로컬 변경을 자동 버리지 않는다.
+- 준비/재연결/read scope는 controlled viewMode로 잠그며 쓰기·파일 업로드·포인터/follow/broadcast/save는 session.canWrite를 확인한다. account 변경/route 변경/close/stop/unmount는 worker/provider/listener/queue를 정리한다. 최초 성공에만 개인 Cloud drawing/baseline을 분리해 협업 scene을 이전 개인 그림에 autosave하지 않는다. read scope는 일반 협업 저장 종료 경고를 띄우지 않는다.
+- 완료 조건: 실제 편집기로 ACK 전 원본 보존, 실패/취소·계정 변경/늦은 scene·초기 peer 업데이트/재연결/read/write/provider 선택/cleanup 검사, 기존 입장/협업/저장 회귀 및 타입·린트·빌드·guardrail. 활성화 UI 관찰은 로컬 opt-in/합성 데이터만 사용한다. hosted 두 계정/Storage·scene 파일/최초 room 생성 UI 및 공개 abuse·메모리·로그 정책은 별도이며 이 flag를 운영에 켜지 않는다.
+- 빌드 확인: 새 static dependency가 기존 2.3 MiB PWA precache 한도를 넘기므로 Supabase provider/session/ticket request는 입장 시 dynamic import한다. 주 bundle 캐시 제외나 PWA 비활성화로 해결하지 않는다. 기능상 필요한 작은 bundle 증가가 여전히 한도를 넘으면 실제 결과를 기록하고 한도를 최소 상향해 앱 자체의 offline precache를 유지한다.
+- dynamic import 후 main bundle은 약 2,412.20 kB로 기존 2.3 MiB 한도보다 약 0.5 kB 크다. app Vite 설정의 precache 한도만 2.4 MiB로 올려 main 및 작은 lazy chunks의 offline 캐시를 유지한다. runtime 캐시/등록 정책/코어 및 dependency는 바꾸지 않는다. typecheck는 Vite 임시 config 생성/삭제와 겹치지 않도록 build 종료 후 실행한다.
+
 ## D-027: 프론트 입장권 세션 수명주기
 
 - 범위 (2026-10-14): 실제 캔버스 전환 전 transport 모듈을 먼저 구현한다. 기존 startCollaboration은 ACK 전 resetScene/Firebase fallback을 수행하므로 그대로 우회하지 않는다. 이번 모듈은 Supabase client/검증된 invite와 현재 작업 callback으로 ticket을 요청하고 socket challenge별 join/renew ACK 후에만 ready로 표시한다. 기존 선택 화면/provider/새 방 잠금과 운영 설정은 유지한다.

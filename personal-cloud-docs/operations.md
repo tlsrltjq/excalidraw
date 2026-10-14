@@ -14,6 +14,18 @@
 
 ## 노트북에서 다시 시작
 
+### 새 입장 UI 로컬 opt-in (2026-10-14)
+
+기본 개발/운영은 새 flag 미설정으로 기존 Firebase 방과 입장 잠금을 유지한다. 개발 opt-in만 확인할 때 별도 loopback 포트를 사용한다.
+
+```bash
+VITE_COLLAB_SUPABASE_ENABLED=true yarn --cwd excalidraw-app vite --host 127.0.0.1 --port 3005 --strictPort
+```
+
+이 flag는 URL/공개 key와 같은 브라우저 공개 설정이며 secret이 아니다. secret/public signing key/DB/Edge/relay를 대신 준비하지 않는다. 운영 Vercel에 지금 추가하지 않는다. 3005에서 실제 relay까지 연결하려면 별도 로컬 서버의 Origin을 명시적으로 맞춰야 하며 운영 Render allowlist를 늘려서 대신 검사하지 않는다. 실행만으로 운영 DB를 초기화/배포하지 않는다. 유효한 hosted invite는 아직 준비되지 않았다.
+
+이번 Safari 관찰은 합성 초대의 선택/확인 중 잠금/오류·재시도/닫기만 확인했다. 임시 탭과 3005 서버를 종료했으며 기본 3001/기존 사용자 탭은 유지했다. 실제 성공/원본 보존/readonly/provider는 자동 검사 결과를 따른다. build와 typecheck는 순서대로 실행한다. 동시에 실행하면 Vite가 만드는 임시 `.timestamp-*.mjs`를 typecheck가 읽다가 삭제돼 TS6053이 날 수 있다. PWA는 main/lazy chunks의 precache 유지와 2.4 MiB 제한을 적용했다.
+
 ### 미배포 relay 입장 검사 (2026-10-14)
 
 2026-10-14 프론트 worker 후속: 동일 하네스는 `relaySession.ts` 자체를 실제 Socket.IO client/relay와 연결해 입장·갱신·read 다운그레이드를 추가 확인한다. app ticket 요청은 아직 UI에서 호출하지 않는다. 새 request/worker만 확인하려면 아래를 실행한다. Supabase는 mock이며 실제 DB/함수 배포가 필요 없다.

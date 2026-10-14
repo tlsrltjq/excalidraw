@@ -5,6 +5,11 @@ import { useEffect, useRef, useState } from "react";
 
 import { useCloudSession } from "../../cloud/session";
 import { isCloudConfigured } from "../../cloud/supabaseClient";
+import { useAtomValue } from "../../app-jotai";
+import {
+  inviteConnectionAtom,
+  isSupabaseCollabEnabled,
+} from "../../collab/persistence/inviteState";
 import {
   checkCollabInvitation,
   signInForCollabInvite,
@@ -21,8 +26,16 @@ import "./CollabEntry.scss";
 
 import type { SupabaseInvite } from "../../collab/persistence/invites";
 import type { ParticipationMode } from "../../collab/persistence/admission";
+import type { CollabAPI } from "../../collab/Collab";
 
-const EntryDialog = ({ link }: { link: string }) => {
+type Props = {
+  collabAPI?: Pick<
+    CollabAPI,
+    "startInvitation" | "cancelInvitationConnection"
+  > | null;
+};
+
+const EntryDialog = ({ link, collabAPI }: { link: string } & Props) => {
   const { status, session } = useCloudSession();
   const [phase, setPhase] = useState<
     "choose" | "checking" | "verified" | "error"
@@ -41,8 +54,9 @@ const EntryDialog = ({ link }: { link: string }) => {
       // Invalidate every operation started during this effect's lifetime.
       // eslint-disable-next-line react-hooks/exhaustive-deps
       generation.current++;
+      collabAPI?.cancelInvitationConnection();
     };
-  }, [userId]);
+  }, [userId, collabAPI]);
 
   let invite: SupabaseInvite | null = null;
   try {
@@ -71,12 +85,26 @@ const EntryDialog = ({ link }: { link: string }) => {
         return;
       }
       const permission = await checkCollabInvitation(invite, mode);
+      if (!current()) {
+        return;
+      }
+      if (isSupabaseCollabEnabled()) {
+        if (!collabAPI) {
+          throw new Error("편집기를 준비하지 못했습니다. 다시 참여하세요.");
+        }
+        await collabAPI.startInvitation(mode, current);
+        return;
+      }
       if (current()) {
         setScope(permission);
         setPhase("verified");
       }
     } catch (caught) {
       if (current()) {
+        if (caught instanceof Error && caught.name === "AbortError") {
+          setPhase("choose");
+          return;
+        }
         setError(
           caught instanceof Error
             ? caught.message
@@ -93,6 +121,7 @@ const EntryDialog = ({ link }: { link: string }) => {
 
   const close = () => {
     generation.current++;
+    collabAPI?.cancelInvitationConnection();
     try {
       clearInviteReturn();
     } catch {
@@ -170,9 +199,10 @@ const EntryDialog = ({ link }: { link: string }) => {
   );
 };
 
-export const CollabEntry = () => {
+export const CollabEntry = ({ collabAPI }: Props = {}) => {
   const [link, setLink] = useState(window.location.href);
   const { status } = useCloudSession();
+  const connected = useAtomValue(inviteConnectionAtom);
   useEffect(() => {
     const update = () => setLink(window.location.href);
     const events = ["hashchange", "popstate", "personal-collab-route-change"];
@@ -199,5 +229,7 @@ export const CollabEntry = () => {
       /* A blocked storage must not break local editing. */
     }
   }, [status, link]);
-  return needsCollabEntry(link) ? <EntryDialog key={link} link={link} /> : null;
+  return needsCollabEntry(link) && connected !== link ? (
+    <EntryDialog key={link} link={link} collabAPI={collabAPI} />
+  ) : null;
 };
