@@ -99,7 +99,16 @@ for (const file of files) {
 
   const content = readChangedFile(file);
   for (const { name, pattern } of secretPatterns) {
-    if (pattern.test(content)) {
+    // Only this exact server env lookup is allowed, not credential literals.
+    const inspected =
+      name === "Supabase service role in browser source" &&
+      file.startsWith("supabase/functions/")
+        ? content.replace(
+            /Deno\.env\.get\("SUPABASE_SERVICE_ROLE_KEY"\)/g,
+            "SERVER_ENV_LOOKUP",
+          )
+        : content;
+    if (pattern.test(inspected)) {
       errors.push(`${file}: found ${name}. Do not expose secrets in tracked source.`);
     }
   }

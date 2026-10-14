@@ -1,5 +1,13 @@
 # 설계 결정 기록
 
+## D-023: 초대 검증 파일 프록시와 private bucket
+
+- 결정 (2026-10-14): Supabase Edge Function의 파일 프록시가 upload/download마다 기존 collab_check_invite로 proof/room/만료/폐기/scope를 검사한다. 게스트 때문에 이 새 함수만 플랫폼 JWT 검사 없이 호출할 수 있게 구성하되 내부 초대 검증은 필수다. 실제 배포/설정 변경은 이번 범위가 아니다.
+- collab-files는 private, 최대 4 MiB application/octet-stream bucket이다. anon/authenticated의 직접 Storage 접근은 restrictive RLS로 차단한다. 서버 전용 관리자 credential은 Edge env에만 두고 브라우저/fixture/log에 넣지 않는다. Origin은 명시 allowlist이며 권한 인증 대체가 아니다. 공개/signed URL을 발급하지 않고 매 요청 확인 후 bytes를 프록시해 폐기 후 새 다운로드 요청을 거부한다. 이미 받은 bytes와 이미 허용된 실행 중 작업은 회수하지 못한다.
+- 클라이언트가 전달한 owner/path/URL은 받지 않는다. room namespace/초대 UUID/proof/operation/file ID/schema/크기를 검증하고 서버가 room/file ID 경로를 만든다. supported file ID는 기존 SHA-1/nanoid와 legacy 단일 segment(1~128 ASCII 영숫자/underscore/hyphen)를 유지하며 다른 ID는 오류로 보고하고 재작성하지 않는다.
+- 기존 FileManager encoder의 암호화·압축 bytes와 upstream decompressor/metadata를 그대로 사용한다. file ID 경로 덮어쓰기는 기존 Firebase의 retry/upsert 동작과 같고 다른 room은 격리한다. 파일별 부분 성공/실패를 유지하며 삭제/정리는 하지 않는다. 일반 Cloud 초안/Storage와 구분한다.
+- 완료 조건: bucket/RLS migration, 순수 Web Request 기반 파일 gateway와 서버 env entrypoint, client save/load 구현, 실제 encode/decode 및 오류/권한/크기/다른 room/부분 실패 검사. Deno entrypoint와 PostgreSQL 정책 검사를 앱 타입 검사와 구분한다. 전체 adapter/controller/relay ticket/운영 적용/실기기 이미지 새로고침은 후속이다. 무료 범위를 유지하며 요청/총 용량 rate limit과 운영 body/header 로그 검토 전 활성화하지 않는다.
+
 ## D-022: 초대 입장 선택 화면과 OAuth 복귀
 
 - 결정 (2026-10-14): 새 provider/초대/sc_ URL은 앱 초기화와 기존 Collab 시작에서 차단하고 로그인/게스트 선택 화면으로 보낸다. 잘못된 route도 기존 Firebase로 fallback하지 않는다. 초기 local scene은 유지하고 실행 중 URL 전환에서는 현재 canvas를 교체하지 않는다.

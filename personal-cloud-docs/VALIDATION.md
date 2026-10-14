@@ -1,5 +1,14 @@
 # MVP 검증 기록
 
+## 2026-10-14 private 협업 파일 기반
+
+- 변경: private collab-files bucket migration, 미배포 Edge config/handler/index, Supabase 파일 client/test, gateway test, 로컬 Storage schema/policy 검사와 기존 DB 하네스 확장, 정확한 server env lookup만 허용하는 guardrail 및 fixture 검사, 관련 docs. core/package/dependency/기존 provider/운영 env/DB/Storage/relay/배포는 변경하지 않았다. 실제 관리자 secret은 조회·저장·출력하지 않았다.
+- 집중 앱 테스트 118개 통과: 기존 87 + gateway 22/client 9. Web Request/Response와 실제 HKDF/upstream 압축·AES codec 사용, Storage backend와 Functions invoke는 in-memory 연결이다. 원본 file ID/data URL/metadata 복원, 새 client instance 복원, dedupe/부분 실패/재시도/허용되지 않은 prefix·key·ID·크기·body·Origin/읽기 전용 쓰기 차단, unknown 성공·통신 오류, 다른 file ID로 옮긴 암호문/늦은 room generation 결과 차단을 검사했다. 합성 TEST data URL은 codec 검사용이고 실제 PNG 렌더링 검사는 아니다.
+- 일회용 PostgreSQL storage schema stub에 bucket migration 적용, private/4 MiB/MIME 확인 및 anon/authenticated SELECT·INSERT·UPDATE·DELETE 차단, 일부러 broad permissive policy를 추가해도 restrictive policy 차단, 다른 bucket 기존 policy 유지/원본 fixture 보존까지 11항목과 rollback 확인. 기존 scene/RLS 28항목·rollback·두 실제 DB 연결 CAS 경쟁도 재실행했다. 실제 Supabase Storage API/JWT 검사로 표기하지 않는다.
+- 타입/전체 린트/빌드, server source/DB 하네스 scoped lint, Node guardrail fixture 4개 통과. 공식 Deno Docker image의 Deno 2.9.7/TypeScript 6.0.3으로 Edge index check 통과(컨테이너 network 없음). 초기 부분 실패 mock이 async crypto 완료 순서에 의존해 실패한 것을 특정 file ID에만 장애를 주도록 고쳤다. 도구의 초기 Docker 명령은 deno 실행 파일이 빠져 실패해 수정 후 재확인했다.
+- 기존 Firebase config 미설정/MetaProperty/font/chunk/Browserslist/Node 및 guardrail 스크립트의 기존 console warning 유지. new file 모듈은 기본 provider에 미연결이라 build는 실제 Storage 기능 활성화 검사가 아니다. guardrails/diff/새 파일 formatting 확인 후 기능 브랜치에 커밋한다.
+- 생략/남은 위험: 전체 앱 테스트/실제 Edge↔Supabase REST/두 계정·guest HTTP/실제 이미지 업로드 실패·reload·다른 기기/Storage SDK 및 backend timeout 장애/실시간 ticket/전체 adapter. 이미 허용된 Storage 작업과 폐기 사이의 경합은 원자적이지 않다. upstream inflate 중 메모리 상한, rate/총 용량/header·body 로그 점검도 공개 활성화 전 남아 있다. secret 배포나 function verify 설정의 운영 변경은 수행하지 않았다.
+
 ## 2026-10-14 Safari 입장 화면 후속 확인
 
 - Mac 잠금 해제 후 Safari의 새 임시 탭에서 localhost 합성 초대만 사용했다. 로컬 서버가 종료돼 최초 접속 실패를 확인하고 127.0.0.1:3001 Vite를 다시 실행했다. 기존 사용자 탭/그림/DB/운영 배포 설정은 수정하지 않았다.

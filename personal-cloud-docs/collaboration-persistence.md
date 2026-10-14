@@ -34,6 +34,24 @@ Portal -> 암호화된 실시간 메시지 -> 개인 relay
 
 ## Supabase 후속 구현
 
+### 파일 프록시 구현 계획 (D-023, 2026-10-14)
+
+구현: `supabase/functions/collab-files/{handler,index}.ts`는 Web Request 기반 schema/Origin/크기 검사 및 authorize→Storage 순서다. index는 서버 env에서만 관리자 credential을 읽고 기존 REST API를 fetch로 호출해 새 SDK dependency가 없다. 누락 설정은 503, 잘못된 Origin/초대/read scope upload는 거부하며 body/diagnostics를 반환하거나 로그로 출력하지 않는다. config.toml의 verify_jwt=false는 이 미배포 함수에만 한정한다.
+
+`supabaseFiles.ts`는 기존 파일 prefix 계약과 upstream encode/decompress를 유지한다. 전송 동시 실행은 한 호출당 최대 3개, 로드는 ID를 dedupe한다. 파일 ID/key/prefix/bytes/metadata와 성공 응답을 확인하고 부분 실패 목록을 유지한다. 필수 isCurrent callback을 매 await 이후/최종 반환 전에 검사해 room/operation generation이 바뀌면 AbortError로 중단한다. callback은 전체 adapter 연결 단계에서 room/account/generation에 묶어야 하고 결과 적용 직전 controller도 재확인한다. 이미 전송된 서버 쓰기를 취소하지는 못한다.
+
+보안 가드레일은 supabase/functions 내부의 정확한 Deno.env.get 서버 credential lookup만 허용한다. browser/VITE 및 서버 credential literal 금지는 유지하고 임시 Git fixture 검사 4개로 확인했다. 실제 secret은 읽거나 저장하지 않았다.
+
+검증: 실제 upstream AES/압축 codec와 Web Request handler를 통과해 synthetic data URL 복원, 새 client 재생성 복원, 부분 실패/재시도, 다른 room/key 및 늦은 결과를 확인했다. 이는 PNG 렌더링/실제 reload/다른 기기/hosted Storage 검사가 아니다. 일회용 PostgreSQL의 최소 storage schema에서 restrictive RLS 11항목과 기존 scene 28항목을 확인했고 Deno 2.9.7 check를 통과했다. Edge runtime의 실제 REST 업로드/다운로드는 미검증이다.
+
+남은 위험: 원본 codec은 inflate 단계의 최대 메모리 사용량을 제한하는 API가 없다. 이 단위의 압축 전후 bytes 제한은 inflate 중 메모리 상한을 보장하지 않는다. 공개 활성화 전 bounded decode 방안, rate/총 용량/header·body 로그와 실제 hosted HTTP 검사를 다뤄야 한다. 오류가 남으면 저장 성공으로 표시하거나 기존 Firebase에 fallback하지 않는다.
+
+이번 완료 조건은 private collab-files bucket/RLS, 초대 검증 후 암호문 bytes만 중계하는 Edge upload/download, FileManager 파일 계약과 client decoder 및 집중 검사다. 기존 Firebase/운영 backend 선택은 바꾸지 않는다. 게스트 호출에는 플랫폼 JWT 검사 대신 handler가 매번 proof를 검증한다. Origin allowlist만으로 인증하지 않으며 관리자 credential은 server env에서만 읽는다. 실패 요청에 body/header/proof를 로그로 남기지 않는다.
+
+위험: Storage 작업과 초대 폐기는 서로 다른 transaction이므로 이미 허용된 요청은 폐기 직후 끝날 수 있다. 이미 다운로드한 bytes는 회수할 수 없다. 4 MiB 요청 제한은 총 사용량/rate limit을 대체하지 않는다. 기존 이미지 ID/압축·암호화/metadata는 유지하며 exotic ID는 명시 실패로 처리한다. 실제 hosted Storage/두 계정 HTTP/새로고침 복원은 로컬 mock/정책 결과와 분리한다. 공개/signed URL은 발급하지 않는다.
+
+참고: [Edge 함수 설정](https://supabase.com/docs/guides/functions/function-configuration), [Storage 접근 제어](https://supabase.com/docs/guides/storage/security/access-control).
+
 ### 서버 scene 구현 단위 (D-021)
 
 구현: `supabase/migrations/20261013150000_create_collab_scene_rpc.sql`의 room/invite/scene + 관리/check/read/CAS 함수. proof SHA-256은 PostgreSQL 기본 sha256(bytea)를 사용해 추가 extension이 필요 없다. owner에게 room/초대 SELECT와 room disabled UPDATE만 주며 직접 scene 접근/테이블 생성·쓰기/권한 helper 호출은 닫았다. 비로그인과 로그인 역할에 check/read/CAS RPC만 공개하고 항상 proof를 검증한다. 로그인/게스트 선택은 UI 후속이며 계정별 초대 대상 지정 기능은 아니다.

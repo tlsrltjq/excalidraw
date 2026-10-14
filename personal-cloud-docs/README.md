@@ -15,6 +15,8 @@
 
 ## 지금 어디까지 왔나
 
+Milestone 8 private 파일 단위 (2026-10-14): `codex/collab-private-files`에서 collab-files private bucket/RLS migration, 매 요청 초대를 검사하는 Edge 파일 프록시와 client save/load를 구현했다. 기존 encoder/decoder로 암호문 복원·부분 실패·재시도·다른 room/key·stale 결과를 검사했다. 집중 앱 테스트 118개, 로컬 Storage 정책 11항목 및 기존 scene 28항목/경쟁 검사, Deno 타입 검사를 통과했다. 운영 DB/함수 배포/기본 provider 연결은 아직 하지 않았고 다음은 전체 Supabase adapter와 relay ticket 연결이다.
+
 Milestone 8 입장 선택 화면 (2026-10-14): `codex/collab-entry-choice`에서 새 초대의 로그인/게스트 선택, RPC 권한 확인/오류 재시도, 같은 탭의 5분·일회용 OAuth 복귀를 연결했다. 게스트 client는 Workspace 로그인 세션과 분리한다. 기존 링크는 Firebase를 유지하고 새 route는 기존 소켓/그림 자동 열기로 우회하지 않는다. 초대 확인 성공은 실제 공동편집 연결 성공이 아니며 Storage/relay ticket/전체 adapter와 운영 DB 적용은 남아 있다. 집중 검사 87개와 타입/린트/빌드 검증, Safari 확인 여부는 VALIDATION을 따른다.
 
 Milestone 8 서버 scene 단위 (2026-10-13): `codex/collab-scene-rpc`에 owner room/초대 관리, 로그인·게스트 공통 proof 검증과 scene CAS SQL/RLS, 미연결 Supabase scene store를 구현했다. 일회용 PostgreSQL에서 권한 검사 28개/rollback/두 DB 연결 CAS 경쟁을 확인했고 집중 앱 테스트 50개를 통과했다. 운영 Supabase migration 적용·Storage·relay ticket·입장 선택 화면·provider 활성화는 아직 하지 않았다. 재현 방법은 operations의 일회용 협업 DB 검사에 있다.

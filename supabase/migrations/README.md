@@ -21,6 +21,8 @@
 
 ## 적용 방법
 
+`20261014110000_create_collab_files_bucket.sql`은 private collab-files bucket/4 MiB MIME 제한 및 anon/authenticated 직접 접근 차단 restrictive policy다. 로컬 storage schema stub에서만 검사했고 운영 미적용이다. 기존 drawing-files bucket/policy는 바꾸지 않는다. 파일 작업은 proof 검증 Edge 프록시만 사용하며 함수·전체 adapter·relay 준비 전에 bucket을 공개하거나 직접 CRUD policy를 추가하지 않는다.
+
 `20261013150000_create_collab_scene_rpc.sql`은 협업 room/초대/암호화 scene 및 검증/CAS RPC다. 로컬 일회용 PostgreSQL에서만 적용·검사했고 운영에는 미적용이다. owner SELECT/disabled 갱신과 제한된 RPC 이외의 table 접근은 닫는다. guest에 공개된 RPC도 매 요청 proof/room/만료/폐기/scope를 검증한다. 운영 적용 전 `personal-cloud-docs/operations.md`의 협업 DB 검사와 D-021 후속 조건을 확인한다. fixture용 `collab-local-bootstrap.sql`은 운영에 실행하지 않는다.
 
 Supabase CLI를 쓰는 경우:

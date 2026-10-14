@@ -28,6 +28,30 @@ node personal-cloud-harness/check-collab-scene.node-test.mjs
 
 새 migration `20261013150000_create_collab_scene_rpc.sql`은 현재 운영에 미적용이다. 실제 적용 전 HTTP/JWT 검사 계획과 body 로그/rate limit/용량 정책을 확인한다. migration만 적용해도 Storage/relay ticket/입장 UI/provider 전환은 완성되지 않는다. 기존 migration을 전부 다시 실행하거나 RLS를 끄지 않는다.
 
+### 협업 파일 함수 검사와 향후 배포
+
+2026-10-14: collab-files gateway는 코드만 작성했고 운영에 배포하지 않았다. 앱의 기본 provider도 Firebase이므로 지금 DB migration이나 함수만 적용해도 새 방/이미지 저장 기능 전체가 활성화되지는 않는다. Edge 함수는 노트북에서 웹 앱처럼 매번 켜는 서버가 아니라 Supabase가 관리하며, 실제 재배포는 별도 단계다.
+
+로컬 검사:
+
+```bash
+node personal-cloud-harness/check-collab-scene.node-test.mjs
+node --test personal-cloud-harness/check-guardrails.node-test.mjs
+docker run --rm --network none -v "$PWD:/workspace:ro" -w /workspace denoland/deno:alpine deno check supabase/functions/collab-files/index.ts
+```
+
+첫 명령은 일회용 PostgreSQL로 scene 검사와 private bucket 정책 11항목을 실행한 뒤 제거한다. Storage는 최소 SQL stub이며 실제 HTTP 서비스가 아니다. Deno image는 공식 이미지를 검사에만 사용하고 host port를 열지 않는다. 첫 실행은 이미지 다운로드가 필요하며 이번 확인 버전은 Deno 2.9.7이다.
+
+향후 운영 적용 순서 (아직 실행하지 않음):
+
+1. 대상 Supabase 프로젝트를 확인하고 scene RPC migration 및 `20261014110000_create_collab_files_bucket.sql` 적용 범위를 검토한다. 기존 migration 전체 재실행/기존 bucket 공개/전역 RLS 해제는 하지 않는다.
+2. 이 함수의 서버 runtime에 SUPABASE_URL/기존 ANON key/관리자 credential이 제공되는지 확인한다. 관리자 credential은 브라우저/Vercel의 VITE 변수나 이 저장소에 넣지 않는다. COLLAB_ALLOWED_ORIGINS에는 확인된 정확한 앱 origin만 설정하고 localhost는 테스트 기간만 허용한다. 누락 설정은 503으로 닫힌다.
+3. rate/총 용량/압축 해제 메모리 제한 및 인프라 body/header 로그를 검토한다. 무료 플랜/카드 없음 조건을 유지하며 유료 옵션을 요구하면 중단한다.
+4. Supabase CLI가 설정된 환경에서 해당 함수만 배포한다. `supabase/config.toml`은 이 함수의 플랫폼 JWT 검사만 비활성화하며 handler의 proof 검증을 대신한다. 다른 함수/프로젝트 Auth 설정을 바꾸지 않는다. 이 설정의 실제 공개 적용은 별도로 확인한 뒤 수행한다.
+5. 유효/없는/만료/폐기된 초대로 upload/download, read scope upload 거부, 다른 room, 직접 Storage anon/auth 접근 거부를 실제 HTTP로 확인한다. synthetic TEST 파일만 쓰고 원본 그림/파일은 덮지 않는다. 이후 전체 adapter/relay ticket 연결 및 실제 이미지 reload/다른 기기 복원을 확인한 뒤 새 방을 활성화한다.
+
+장애 구분: 403은 Origin/초대/scope, 400/413/415는 입력·크기·content type, 404는 파일 부재, 503은 설정/RPC/Storage 오류 가능성이다. 세부 body/proof/관리자 credential을 로그에 출력하지 말고 요청 종류·status만 기록한다. 서버 설정 오류를 해결하려고 bucket을 public으로 바꾸거나 기존 Firebase로 자동 저장하지 않는다.
+
 ### 웹 앱 시작
 
 2026-10-14 개발 참고: 새 Supabase 초대 URL(`collabStorage=supabase`, `invite` UUID, `#room=sc_...,...`)에서는 로그인/게스트 선택 화면을 표시한다. 임의 실제 초대를 만들지 말고 전달받은 유효한 초대로 검사한다. 현재 운영 DB에는 협업 RPC migration이 미적용이라 서버 설정 오류가 날 수 있고, 권한 확인 성공 뒤에도 Storage/relay 준비 전 실제 접속은 하지 않는다. 기존 협업 링크와 Cloud Workspace는 기존 방식이다. OAuth 복귀 정보는 same-tab sessionStorage에 최대 5분 남고 소비/닫기/로그인 시작 실패 때 삭제된다. 비밀이 포함된 URL/Storage/RPC body를 문서나 화면 캡처에 노출하지 않는다.

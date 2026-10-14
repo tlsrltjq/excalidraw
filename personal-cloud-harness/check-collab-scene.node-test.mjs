@@ -86,6 +86,35 @@ try {
       "utf8",
     ),
   );
+  await sql(
+    readFileSync(
+      `${root}personal-cloud-harness/collab-files-local-bootstrap.sql`,
+      "utf8",
+    ),
+  );
+  await sql(
+    readFileSync(
+      `${root}supabase/migrations/20261014110000_create_collab_files_bucket.sql`,
+      "utf8",
+    ),
+  );
+  const fileResults = await sql(
+    readFileSync(
+      `${root}personal-cloud-harness/check-collab-files-policy.sql`,
+      "utf8",
+    ),
+  );
+  assert.equal(
+    fileResults.split("\n").filter((line) => line.startsWith("PASS:")).length,
+    11,
+  );
+  assert.equal(
+    (await sql("select count(*) from storage.objects;")).trim(),
+    "0",
+  );
+  process.stdout.write(
+    "PASS: 11 private bucket policy assertions and rollback (local schema stub)\n",
+  );
   const results = await sql(
     readFileSync(
       `${root}personal-cloud-harness/check-collab-scene-access.sql`,

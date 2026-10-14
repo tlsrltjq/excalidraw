@@ -1,0 +1,4 @@
+[functions.collab-files]
+# This function authenticates the invitation itself, including guest requests.
+# Do not deploy until the proof RPC and private bucket policies have been verified.
+verify_jwt = false
