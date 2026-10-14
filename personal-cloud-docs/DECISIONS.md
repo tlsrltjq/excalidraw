@@ -1,5 +1,13 @@
 # 설계 결정 기록
 
+## D-029: 소유자 협업 방·초대 관리
+
+- 범위: Milestone 8의 기본 off flag 아래 로그인 소유자의 빈 방 생성/목록, read/write 초대 발급(1시간·1일·7일), 링크 복사, 폐기를 추가한다. 캔버스 복사나 자동 입장은 하지 않는다. 기존 개인 그림/Firebase/운영 설정은 유지한다.
+- 키는 열린 관리 화면의 메모리와 기존 초대 URL에만 둔다. DB에는 기존 proof hash만 전송한다. 화면을 닫은 뒤에는 기존 링크를 입력해야 같은 방의 새 초대 발급/링크 복사가 가능하다. 키를 재생성해 기존 방을 덮어쓰지 않는다. 목록은 proof_hash를 조회하지 않는다.
+- 복구는 지정한 초대의 proof_hash만 소유자 RLS로 읽어 입력 링크의 HKDF/SHA-256과 비교한다. hash는 UI에 반환/표시하지 않는다. 만료·폐기된 링크도 소유자의 키 복구에는 사용할 수 있지만 이전 초대 권한을 되살리지 않는다. 타 계정은 RLS 때문에 복구에 필요한 행을 읽을 수 없다.
+- 생성과 첫 초대는 기존 별도 RPC를 사용한다. 부분 성공/응답 유실에는 동일 room/key/invite/expiry로 재시도하고 충돌 시 RLS로 읽은 소유자 메타데이터를 확인한다. 빈 방이 남을 수 있으며 키는 복구 불가능하므로 화면에 링크 보관 주의를 표시한다. 중복 클릭은 single-flight로 막는다.
+- 완료 조건: owner SDK와 관리 UI의 생성/재시도·read/write·만료·폐기·계정 변경/닫기 지연 응답·flag 검사, guardrails/type/lint/build. 새 migration/dependency 없이 기존 RLS/RPC를 사용한다. 실제 hosted 두 계정/relay/파일 검증은 배포 전 후속이며 이번에 활성화하지 않는다. 폐기는 새 요청을 거부하지만 이미 받은 데이터는 회수 불가능하고 연결에는 최대 60초 TTL 지연이 있다.
+
 ## D-028: 선택 화면과 Supabase room controller 연결
 
 - 범위 (2026-10-14): 기본 off인 공개 `VITE_COLLAB_SUPABASE_ENABLED` flag 아래 새 입장 API/선택 화면/Portal/session/provider를 연결한다. legacy startCollaboration/Firebase fallback은 새 방에서 호출하지 않는다. 운영 env/DB/Edge/Render는 변경하지 않는다.

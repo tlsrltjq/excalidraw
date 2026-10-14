@@ -1,0 +1,77 @@
+.personal-room-management {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--color-on-surface);
+  label {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  input,
+  select {
+    min-width: 0;
+    max-width: 100%;
+    flex: 1;
+    padding: 8px;
+    background: var(--color-surface-low);
+    color: inherit;
+    border: 1px solid var(--default-border-color);
+    border-radius: 4px;
+  }
+  button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px;
+    min-height: 36px;
+    color: inherit;
+    background: var(--color-surface-low);
+    border: 1px solid var(--default-border-color);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+  ul {
+    padding: 0;
+    margin: 0;
+    max-height: 240px;
+    overflow: auto;
+  }
+  li {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--default-border-color);
+  }
+  li > div {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  small {
+    display: block;
+  }
+  &__settings,
+  &__recover {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  &__warning {
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0;
+  }
+}

@@ -103,6 +103,7 @@ import { AppFooter } from "./components/AppFooter";
 import { AppMainMenu } from "./components/AppMainMenu";
 import { Dashboard } from "./components/cloud/Dashboard";
 import { VersionHistory } from "./components/cloud/VersionHistory";
+import { RoomManagement } from "./components/cloud/RoomManagement";
 import { CloudSaveStatus } from "./components/cloud/CloudSaveStatus";
 import { CollabEntry } from "./components/cloud/CollabEntry";
 import { needsCollabEntry } from "./collab/persistence/entryRoute";
@@ -1156,6 +1157,7 @@ const ExcalidrawWrapper = () => {
         <Dashboard excalidrawAPI={excalidrawAPI} />
         {!isCollabDisabled && <CollabEntry collabAPI={collabAPI} />}
         <VersionHistory excalidrawAPI={excalidrawAPI} />
+        {!isCollabDisabled && <RoomManagement />}
         <CloudSaveStatus excalidrawAPI={excalidrawAPI} />
 
         <ShareDialog

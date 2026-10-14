@@ -1,5 +1,14 @@
 # MVP 검증 기록
 
+## 2026-10-14 소유자 방·초대 관리
+
+- 변경: app RoomManagement UI/SCSS/test, cloud 로그인 메뉴와 App mount, owner SDK/test, README/ROADMAP/DECISIONS(D-029)/operations/검증 기록. core/dependency/schema/Edge/relay/운영 설정은 변경하지 않았다. 기본 off flag와 기존 Firebase 유지.
+- SDK는 cryptographic room/key/UUID 생성, 깨끗한 초대 URL, owner RPC create/issue/revoke, proof 없는 목록, 소유자 RLS를 통한 지정 proof hash 키 복구를 구현했다. 응답 유실/부분 성공은 같은 draft ID/키/expiry로 재시도하며 일치 메타데이터와 초대 proof를 확인한다. 만료/폐기 링크의 키 복구는 소유자만 가능하며 이전 초대 권한을 되살리지 않는다.
+- mock SDK/UI 집중 검사: 새 SDK 12개, UI 11개. read/write·만료 선택·초기 write 초대, owner RLS 실패/disabled/응답 유실, 폐기/만료, 재시도 동일 draft·중복 클릭, key 복구/다른 room/실패, 로그인/flag/계정 전환/닫기 stale 응답을 확인했다. 관련 persistence/선택 UI/기존 협업 회귀를 함께 실행했다. 실제 HTTP/운영 DB 권한 검증을 대체하지 않는다.
+- 최종 집중 결과는 16파일/211개 통과. iframe에서는 기존 협업 차단과 동일하게 새 관리 메뉴도 숨긴다. 변경 12파일 guardrails 및 코드 scoped format/diff 검사 통과.
+- 타입/전체 lint/build(PWA precache 62 entries) 및 guardrails/diff 검증을 실행했다. 기존 Node/MetaProperty/font/chunk/Browserslist 경고는 유지한다. 전체 앱 suite/DB 역할 하네스/relay 하네스는 이번 작은 owner UI 변경에서 생략했다(기존 서버 계약/정책/transport 무변경). Safari 현재 로컬 탭은 비로그인 상태를 관찰했으며 새 관리 화면의 실제 로그인/실서비스/모바일 시각 검증은 실행하지 않았다. 새 로그인/운영 초대 발급·설정 변경은 없다.
+- 남은 위험: create+issue는 별도 RPC로 빈 방이 남을 수 있고 닫기 후 미발급 키를 복구할 수 없다. 목록은 최신 각 100개까지로 pagination/방 삭제 미구현. 폐기된 데이터 회수 불가/relay TTL 지연. hosted 배포·실제 두 계정/게스트·이미지/재연결/공개 rate·총 용량/로그·inflate 메모리 제한 후 flag 활성화를 검토한다. 다음 단위는 공개 운영 제한이다.
+
 ## 2026-10-14 선택 화면/controller 통합
 
 - 변경: `App.tsx`의 viewMode prop/onChange 잠금, `Collab.tsx`의 새 startInvitation/provider/epoch/scene queue/rollback·cleanup, Portal의 joinLegacy 및 canWrite 가드, inviteState atom, 선택 UI/test, 실제 편집기 `collabInvitation.test.tsx`, 공개 env 타입, app Vite precache limit 및 계획/운영 문서. core/dependency/lockfile/DB/Edge/relay/운영 설정은 변경하지 않았다. `VITE_COLLAB_SUPABASE_ENABLED`는 기본 off다.

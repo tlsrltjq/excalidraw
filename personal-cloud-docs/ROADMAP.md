@@ -806,6 +806,8 @@ D-012 결정에 따라 구현했다 (구글 시트/문서 버전 기록을 단�
 
 2026-10-13 첫 단위 완료: 기존 Firebase 함수를 그대로 연결하는 계약/adapter만 구현했다. 실제 persistence는 여전히 Firebase이며 Supabase adapter/권한/CAS는 후속이다. 설계/범위는 `collaboration-persistence.md` 참고. 이 단위만으로 Milestone 8 전체 완료로 표시하지 않는다.
 
+Milestone 8 최신 진행 (2026-10-14, D-029): 기본 off 아래 소유자용 빈 방 생성/초대 관리 UI 완료. 기존 owner RPC/RLS를 재사용하고 새 migration은 없다. 키는 화면 메모리만 사용하며 소유자 RLS로 지정 초대 hash를 확인해 만료·폐기 링크에서도 키만 복구한다. 운영 활성화와 두 실제 클라이언트 검증은 미완료다. 다음 순서는 공개 rate/총 용량/inflate 메모리·로그 정책 → 운영 DB/Edge·서명 키/relay 적용 → hosted owner/다른 계정/guest/read/write/폐기·파일 복원 검증 → 앱 flag 활성화 여부 결정이다. 무료 설정을 유지하며 AI Gateway는 그 이후다.
+
 ## Milestone 9: AI Gateway
 
 - [ ] 별도 설계 문서 `ai-gateway.md` 작성

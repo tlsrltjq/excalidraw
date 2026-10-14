@@ -1,7 +1,9 @@
+import { isRunningInIframe } from "@excalidraw/common";
 import { MainMenu } from "@excalidraw/excalidraw/index";
 import {
   loginIcon,
   LibraryIcon,
+  usersIcon,
 } from "@excalidraw/excalidraw/components/icons";
 import React from "react";
 
@@ -13,7 +15,10 @@ import {
   signOut,
 } from "../../cloud/session";
 
+import { isSupabaseCollabEnabled } from "../../collab/persistence/inviteState";
+
 import { dashboardOpenAtom } from "./Dashboard";
+import { roomManagementOpenAtom } from "./RoomManagement";
 
 /**
  * Personal Cloud login/logout menu entry. Renders nothing when Cloud isn't
@@ -24,6 +29,7 @@ import { dashboardOpenAtom } from "./Dashboard";
 export const CloudAuthMenuItems: React.FC = () => {
   const { status, session } = useCloudSession();
   const setDashboardOpen = useSetAtom(dashboardOpenAtom);
+  const setRoomManagementOpen = useSetAtom(roomManagementOpenAtom);
 
   if (!isCloudConfigured || status === "loading") {
     return null;
@@ -40,6 +46,14 @@ export const CloudAuthMenuItems: React.FC = () => {
         >
           내 그림
         </MainMenu.Item>
+        {isSupabaseCollabEnabled() && !isRunningInIframe() && (
+          <MainMenu.Item
+            icon={usersIcon}
+            onSelect={() => setRoomManagementOpen(true)}
+          >
+            내 협업 방
+          </MainMenu.Item>
+        )}
         <MainMenu.Item
           icon={loginIcon}
           onSelect={() => {

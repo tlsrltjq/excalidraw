@@ -15,6 +15,8 @@
 
 ## 지금 어디까지 왔나
 
+Milestone 8 소유자 방 관리 (2026-10-14): `codex/collab-room-management`에 내 협업 방 메뉴/빈 방 생성, 편집·읽기 전용 초대, 1시간·1일·7일 만료, 복사·폐기·키 복구·부분 실패 재시도를 구현했다. 기본 off flag와 운영 Firebase는 유지한다. 새 캔버스를 자동 열거나 현재 개인 그림을 복사하지 않는다. 다음은 공개 rate/용량·로그/메모리 제한을 마무리하고 미적용 DB/Edge/relay를 순서대로 적용해 실제 두 클라이언트로 확인하는 단계다. 사용 방법은 operations, 검증/미확인은 VALIDATION 최신 기록을 따른다.
+
 Milestone 8 입장 화면/controller 연결 (2026-10-14): `codex/collab-entry-integration`에서 선택→입장 ACK→Supabase scene 준비→캔버스 전환을 연결했다. 초기 실패/취소에는 기존 scene/files/개인 그림 연결을 보존하며 초기 peer 업데이트를 bounded queue로 병합한다. 재연결 병합·읽기 전용 잠금·저장/파일/포인터/follow 전송 방어와 종료 cleanup을 구현했다. **`VITE_COLLAB_SUPABASE_ENABLED`는 기본 off이며 운영에 켜지 않았다.** 다음은 사용자용 새 방 생성/초대 관리, 공개 활성화 전 용량·로그·rate 제한 및 hosted DB/Edge/relay 적용·두 실제 클라이언트 검증이다. 결과와 생략은 VALIDATION 최신 기록을 따른다.
 
 Milestone 8 프론트 세션 기반 (2026-10-14): `codex/collab-client-session`에서 입장권 요청 client와 ACK 이후 준비 완료되는 transport worker를 구현했다. 30초 전 갱신, read/write 상태, timeout/만료/visibility 복귀/재연결/stale 응답/정리를 처리하고 실제 loopback relay와 입장·갱신·read 다운그레이드를 확인했다. **아직 선택 화면/controller/provider에 연결하지 않았다.** 다음은 입장 ACK와 원격 scene 준비가 성공한 뒤 캔버스를 전환하고 실패 시 현재 scene을 보존하는 통합 단위다. 운영 배포/새 방 UI 잠금은 유지한다.
