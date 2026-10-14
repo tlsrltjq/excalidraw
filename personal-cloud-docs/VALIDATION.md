@@ -1,5 +1,13 @@
 # MVP 검증 기록
 
+## 2026-10-14 프론트 admission 세션 기반
+
+- 변경: `collab/persistence/relayTicketRequest.ts`/test, `relaySession.ts`/test, 선택한 account/guest client를 반환하도록 기존 admission helper export, 실제 relay 하네스 worker 검사와 README/ROADMAP/DECISIONS/협업 저장/operations/검증 문서. controller/Portal/App/선택 UI/core/dependency/DB/Edge/별도 서버 소스/운영 설정은 변경하지 않았다. runtime provider는 Firebase, 새 방 UI는 잠금 상태다.
+- 집중 앱 검사 91개/8파일 통과: 새 request 15/worker 16, 기존 issuer 31/admission 7/선택 화면 10/adapter 7/실제 편집기 협업 2/operation 3. 실제 HKDF·P-256 서명 ticket을 request 검사에 쓰며 Functions invoke/Socket는 mock이다. proof만 전송/key·scope 비전송/unknown 응답·오류 비노출/abort·stale, ACK와 preparation 이전 writable 잠금, read/갱신·scope 변경/visibility single-flight, 늦은 ticket·ACK/재연결/close·외부 generation 변경/timeout/만료를 검사했다. 초기 mock tuple 타입 오류는 명시적인 request signature로 수정 후 타입·빌드·테스트를 재확인했다.
+- 같은 relay 하네스에 실제 `relaySession.ts`를 연결했다. 실제 loopback 서버/Socket.IO와 P-256 signer로 입장→암호문 bytes 전송→갱신→write에서 read로 잠금→재연결 새 challenge/입장권 및 수신을 확인했다. Supabase HTTP는 호출하지 않고 synthetic signer request를 주입했다. 처음 ticket은 29초 전에 발급한 유효 ticket으로 만들어 실제 약 1초 뒤 renewal timer를 확인했다. 실제 브라우저 UI/초대 계정 인증·30초 장기 대기 검사로 표기하지 않는다. 최종 하네스 12개 및 nested legacy 7개 통과 후 임시 서버와 연결을 종료했다.
+- 타입/전체 code lint/빌드 통과 후 마지막 reconnect 대기 제한과 preparation 취소 검사 추가를 집중 91개/타입/scoped lint/빌드로 재확인했다. 기존 Firebase config/MetaProperty/font·chunk·Browserslist/Node module type 경고는 유지한다. 변경 코드 scoped format/diff/guardrails(변경 12파일) 통과. 로컬 3001 HTTP 200이며 화면 검증을 대체하지 않는다.
+- 생략/남은 위험: 전체 앱 테스트, Safari/두 실제 브라우저/모바일/실제 background tab timer clamp·OS clock skew, hosted Edge/JWT·DB/Storage/Render cold start/권한 폐기·배포·키 회전. worker가 parsed claims로 권한을 신뢰하는 것이 아니라 relay ACK 후 canWrite를 여는 계약이며 UI/controller는 아직 이 worker를 사용하지 않는다. 다음은 ACK 후 scene 준비/기존 scene 보존/초기 원격 업데이트 경합/read-only viewMode/provider/계정·route·stop 수명주기 연결이다. 운영 비용·무료 설정/실제 데이터는 변경하지 않았다.
+
 ## 2026-10-14 relay socket 입장·갱신 연결
 
 - 변경: 별도 relay `src/index.ts`, 새 `src/admission.ts`/byte-identical `src/ticket.ts`, Node 24에 맞춘 ES2020/CommonJS tsconfig와 PERSONAL 가이드. 앱 저장소는 `check-room-admission.node-test.mjs`와 계획/운영/검증 문서만 변경했다. app controller/provider/core/dependency/lockfile/DB/Edge 함수/운영 키·Render/Vercel/무료 설정은 그대로다.

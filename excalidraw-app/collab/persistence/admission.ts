@@ -11,7 +11,7 @@ import type { SupabaseInvite } from "./invites";
 export type ParticipationMode = "account" | "guest";
 let guestClient: SupabaseClient | null = null;
 
-const getClient = (mode: ParticipationMode) => {
+export const getCollabParticipantClient = (mode: ParticipationMode) => {
   const url = import.meta.env.VITE_SUPABASE_URL;
   const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   if (!supabase || !url || !key) {
@@ -37,7 +37,7 @@ export const checkCollabInvitation = async (
   invite: SupabaseInvite,
   mode: ParticipationMode,
 ): Promise<"read" | "write"> => {
-  const client = getClient(mode);
+  const client = getCollabParticipantClient(mode);
   const proof = await deriveInviteProof(invite);
   let result;
   try {

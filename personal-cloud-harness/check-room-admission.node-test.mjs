@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { io } from "socket.io-client";
 
 import { signRelayTicket } from "../supabase/functions/collab-ticket/ticket.ts";
+import { createRelaySession } from "../excalidraw-app/collab/persistence/relaySession.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repo = path.resolve(root, "../excalidraw-room");
@@ -413,6 +414,105 @@ test(
         );
         socket.disconnect();
       });
+      await t.test(
+        "frontend session worker joins, renews and locks a read downgrade",
+        async () => {
+          const socket = io(relay.endpoint, {
+            autoConnect: false,
+            transports: ["websocket"],
+            reconnection: false,
+            extraHeaders: { Origin: origin },
+          });
+          sockets.push(socket);
+          let calls = 0;
+          let firstReady;
+          let renewed;
+          const first = new Promise((resolve) => {
+            firstReady = resolve;
+          });
+          const second = new Promise((resolve) => {
+            renewed = resolve;
+          });
+          const errors = [];
+          const worker = createRelaySession({
+            socket,
+            roomId: room,
+            isCurrent: () => true,
+            visibility: Object.assign(new EventTarget(), { hidden: false }),
+            async requestTicket(challenge, isCurrent, signal) {
+              calls++;
+              assert.equal(isCurrent(), true);
+              assert.equal(signal.aborted, false);
+              const scope = calls === 1 ? "write" : "read";
+              const token = await signRelayTicket(
+                keys.privateKey,
+                { roomId: room, origin, challenge },
+                scope,
+                calls === 1 ? Date.now() - 29000 : Date.now(),
+              );
+              const claims = JSON.parse(
+                Buffer.from(token.split(".")[1], "base64url").toString(),
+              );
+              return { ticket: token, scope, expiresAt: claims.exp * 1000 };
+            },
+            onPending() {},
+            onReady(scope) {
+              if (scope === "write") {
+                firstReady();
+              } else {
+                renewed();
+              }
+            },
+            onError(message) {
+              errors.push(message);
+            },
+          });
+          try {
+            socket.connect();
+            await Promise.race([
+              first,
+              pause(5000).then(() => {
+                throw new Error("Frontend worker join timeout");
+              }),
+            ]);
+            await pause(0);
+            assert.equal(worker.canWrite(), true);
+            await receive(socket, a);
+            await Promise.race([
+              second,
+              pause(5000).then(() => {
+                throw new Error("Frontend worker renewal timeout");
+              }),
+            ]);
+            await pause(0);
+            assert.equal(worker.isReady(), true);
+            assert.equal(worker.canWrite(), false);
+            await receive(a, socket);
+            await absent(a, "client-broadcast", () =>
+              socket.emit("server-broadcast", room, data, iv),
+            );
+            assert.deepEqual(errors, []);
+            assert.equal(calls, 2);
+            const previousId = socket.id;
+            socket.disconnect();
+            assert.equal(worker.isReady(), false);
+            const reconnected = event(socket, "collab-challenge");
+            socket.connect();
+            await reconnected;
+            for (let i = 0; i < 100 && !worker.isReady(); i++) {
+              await pause(20);
+            }
+            assert.notEqual(socket.id, previousId);
+            assert.equal(worker.isReady(), true);
+            assert.equal(worker.canWrite(), false);
+            assert.equal(calls, 3);
+            await receive(a, socket);
+            assert.deepEqual(errors, []);
+          } finally {
+            worker.close();
+          }
+        },
+      );
       await t.test(
         "legacy relay regression against this newly built server",
         async () => {

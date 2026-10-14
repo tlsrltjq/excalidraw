@@ -775,6 +775,8 @@ D-012 결정에 따라 구현했다 (구글 시트/문서 버전 기록을 단�
 
 ## Milestone 8: 공동편집 Persistence 독립
 
+2026-10-14 프론트 세션 단위: ticket request와 challenge/ACK/자동 갱신/만료·재연결 worker를 작성했다(D-027). 실제 relay와 동일 worker의 입장·갱신·read 상태를 확인했다. 기존 startCollaboration이 ACK 전에 canvas reset/Firebase fallback을 하는 경계를 유지하며 새 worker를 아직 UI/controller에 붙이지 않았다. 다음은 ACK 후 remote scene 준비·원본 보존·read-only viewMode/provider 수명주기 통합이다.
+
 2026-10-14 relay 단위: 별도 서버의 sc_ room 입장/갱신·read/write 검사, 소켓별 challenge, 60초 만료 종료, 수신자 필터와 공개 키 미설정 fail-closed를 구현했다(D-026). 기존 hex room 프로토콜은 유지한다. 프론트 입장/provider 연결, read-only UI, hosted DB/Edge/relay 배포 및 실기기 검증은 다음이다. 이 단위는 운영 활성화가 아니다.
 
 2026-10-14 입장권 기반: 고정 버전 ECDSA P-256 입장권 계약, verifier/issuer handler와 미배포 Edge entrypoint를 구현했다(D-025). 서명/위조/만료/room·Origin·challenge·scope 검사 및 요청 제한을 자동 확인했다. 다음은 별도 relay 저장소의 공개 키 검증/socket challenge/갱신/전송 권한 처리와 프론트 입장 연결이다. 아직 실시간 입장 보호가 적용된 운영 서비스는 아니다.

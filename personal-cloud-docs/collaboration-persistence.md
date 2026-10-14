@@ -133,3 +133,18 @@ HTTP handler는 exact Origin allowlist, POST/OPTIONS, strict 입력 allowlist, 4
 한 소켓의 검증 요청은 single-flight이며 60초당 최대 10회다. 재연결은 새 challenge로 새 ticket을 발급한다. relay의 `src/ticket.ts`는 Edge 계약의 byte-identical 사본이며 하네스가 이를 확인한다. 동일 계약을 유지하기 위해 signer export도 포함하지만 relay는 verifier만 호출하고 private key는 취급하지 않는다. Node 24 런타임에 맞춰 TypeScript ES2020/CommonJS 출력을 명시했다. multi-process/Redis adapter로 바꿀 때는 현재 local recipient lookup을 다시 설계해야 한다.
 
 프론트 갱신 timer/실패 안내와 read-only UI/provider 수명주기는 아직 연결하지 않았다. 폐기 이후 이미 발급한 ticket은 최대 60초 유효할 수 있다. per-socket 검증 제한은 전역 연결 수/Origin 위조/native client 남용/전송량 제한을 대체하지 않는다. 운영 Render/Edge/DB/키는 변경하지 않았다.
+
+### 프론트 admission worker (2026-10-14, D-027)
+
+`relayTicketRequest.ts`는 선택한 client/복사한 invite/현재 origin에 묶인 request factory다. 실제 HKDF proof와 challenge만 `collab-ticket`에 전달하고 room key/scope는 전송하지 않는다. AbortSignal/current callback을 proof 계산과 invoke 전후에 확인한다. unknown/extra 응답은 거부하고 body/error detail을 UI에 노출하지 않는다. ticket claim 파싱은 strict context/TTL/scope 검사 및 갱신 일정 힌트이지 서명 검증이 아니다.
+
+`relaySession.ts`는 socket.connect 전에 생성한다. 생성만으로 요청/연결하지 않고 challenge가 왔을 때만 발급을 시작한다. 최초 입장/갱신 ACK와 `onReady(scope,isCurrent)`가 끝난 뒤 isReady/canWrite가 열린다. 적용 콜백도 await 뒤 isCurrent를 확인해야 한다. 갱신은 만료 30초 전이며 전체 authorize/preparation 20초/ACK 10초/최초 또는 재연결 challenge 대기 60초로 제한한다. hard expiry, visibility 복귀, server expiry, 오류 때 writable을 닫고 연결을 종료한다. 일반 transport disconnect는 pending으로 전환하고 새 challenge 재발급을 기다린다.
+
+close는 owned socket을 종료하고 listener/timer/ACK promise/request signal을 정리한다. ticket은 세션 메모리에만 보관한다. scope 변경은 새 ACK 이후 callback으로 전달하며 callback 적용 동안 canWrite가 닫힌다. `getCollabParticipantClient`를 export해 이후 ticket/adapter가 같은 account 또는 분리된 guest client를 사용하도록 준비했다. 브라우저 시계가 서버와 크게 다르면 fail-closed로 초대를 거부할 수 있다.
+
+- [x] 프론트 ticket request/transport 세션 및 실제 loopback worker 입장·갱신 검사
+- [ ] 선택 화면/Collab/Portal에 실제 session/provider/read-only UI 연결
+- [ ] ACK 후 remote scene 준비·적용/기존 scene 보존 및 초기 원격 업데이트 경합 처리
+- [ ] 계정/route/stop 수명주기와 autosave·local-first 복귀 통합
+
+현재 새 모듈은 runtime 미연결이다. 기존 controller의 ACK 전 canvas 초기화/Firebase fallback을 새 방에서 재사용하지 않고 별도 통합 단위로 다룬다. 운영/기존 선택 화면은 그대로이며 이 단위는 사용자 입장 UI 완료가 아니다.

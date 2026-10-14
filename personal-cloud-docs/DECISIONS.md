@@ -1,5 +1,12 @@
 # 설계 결정 기록
 
+## D-027: 프론트 입장권 세션 수명주기
+
+- 범위 (2026-10-14): 실제 캔버스 전환 전 transport 모듈을 먼저 구현한다. 기존 startCollaboration은 ACK 전 resetScene/Firebase fallback을 수행하므로 그대로 우회하지 않는다. 이번 모듈은 Supabase client/검증된 invite와 현재 작업 callback으로 ticket을 요청하고 socket challenge별 join/renew ACK 후에만 ready로 표시한다. 기존 선택 화면/provider/새 방 잠금과 운영 설정은 유지한다.
+- ticket의 strict claim 검사는 UI/만료 시각 힌트일 뿐 서명 권한 판단은 relay ACK가 맡는다. room/Origin/challenge/issuer/audience/version/60초 TTL/scope/크기 검사 후 ready. 서버와 브라우저 시계 차이/갱신 실패는 fail-closed로 연결을 종료하고 원문 오류를 표시하지 않는다. ticket/key/proof는 URL/storage/log에 저장하지 않는다.
+- 갱신은 30초 전, 로컬 hard-expiry timer와 visibility 복귀 재확인, 소켓 generation/single-flight/ACK timeout을 적용한다. disconnect는 ready를 해제하고 재연결 때 새 challenge로 다시 발급한다. stale ticket/ACK는 새 socket에 보내거나 적용하지 않는다. scope 변경은 성공한 갱신 ACK 후 콜백으로 알리고 ready callback 완료 전 writable을 열지 않는다. read grant는 canWrite=false다.
+- 완료 조건: 실제 WebCrypto로 만든 ticket 및 mock Socket/Supabase를 사용해 요청 body·unknown response·single-flight·읽기 전용·갱신·만료·권한 변경·닫기·지연 응답·재연결·background 복귀 검증. 실제 loopback relay와 이 worker를 연결하는 검사도 추가한다. 다음 단위는 선택 화면/controller의 ACK 후 원격 scene 적용·provider·read-only viewMode 연결/실패 시 현재 scene 보존이다. 이번만으로 UI 협업 입장 완료라 하지 않는다.
+
 ## D-026: relay socket 입장·갱신·전송 경계
 
 - 범위 (2026-10-14): 별도 relay 저장소에 sc_ room join/renew acknowledgement, socket별 32-byte random challenge, 공개 P-256 JWK 검증을 연결한다. 공개 키 없으면 새 방만 닫고 legacy hex room은 유지한다. private key/JWT/proof를 relay에 전달하지 않는다. 이번에는 배포/프론트 연결을 하지 않는다.

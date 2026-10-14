@@ -16,6 +16,12 @@
 
 ### 미배포 relay 입장 검사 (2026-10-14)
 
+2026-10-14 프론트 worker 후속: 동일 하네스는 `relaySession.ts` 자체를 실제 Socket.IO client/relay와 연결해 입장·갱신·read 다운그레이드를 추가 확인한다. app ticket 요청은 아직 UI에서 호출하지 않는다. 새 request/worker만 확인하려면 아래를 실행한다. Supabase는 mock이며 실제 DB/함수 배포가 필요 없다.
+
+```bash
+yarn test:app --watch=false excalidraw-app/collab/persistence/relaySession.test.ts excalidraw-app/collab/persistence/relayTicketRequest.test.ts
+```
+
 Node 24 및 이미 설치한 두 저장소 dependencies가 필요하다. 서버 저장소에서 먼저 빌드하고 앱 저장소에서 하네스를 실행한다.
 
 ```bash
