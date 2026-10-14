@@ -2,6 +2,7 @@ import { Blob as NodeBlob } from "node:buffer";
 import { webcrypto } from "node:crypto";
 
 import { generateEncryptionKey } from "@excalidraw/excalidraw/data/encryption";
+import { compressData } from "@excalidraw/excalidraw/data/encode";
 
 import type { BinaryFileData, DataURL } from "@excalidraw/excalidraw/types";
 
@@ -104,6 +105,22 @@ it("roundtrips actual upstream compressed AES bytes through the gateway", async 
   });
   expect(invoke).toHaveBeenCalledTimes(2);
   expect(invoke.mock.calls[0][1].body).not.toHaveProperty("roomKey");
+});
+
+it("rejects an encrypted compression bomb through the real file loader", async () => {
+  const { files, prefix, stored } = setup();
+  const payload = new TextEncoder().encode(
+    `data:image/png;base64,${"A".repeat(8 * 1024 * 1024)}`,
+  );
+  const encoded = await compressData(payload, {
+    encryptionKey: invite.roomKey,
+    metadata: { id, mimeType: "image/png", created: 1 },
+  });
+  stored.set(`${invite.roomId}/${id}`, encoded);
+  expect(encoded.byteLength).toBeLessThan(FILE_UPLOAD_MAX_BYTES);
+  const result = await files.loadFiles(prefix, invite.roomKey, [id]);
+  expect(result.loadedFiles).toEqual([]);
+  expect(result.erroredFiles.get(id)).toBe(true);
 });
 it("keeps upload partial failures and permits retry", async () => {
   const { backend, files, prefix } = setup();

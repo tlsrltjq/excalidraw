@@ -1,3 +1,6 @@
+// @ts-ignore Deno requires explicit extensions; checked separately with deno check.
+import { createRequestBudget } from "../_shared/requestBudget.ts";
+
 export type TicketRequest = {
   roomId: string;
   inviteId: string;
@@ -93,9 +96,12 @@ const readInput = async (request: Request): Promise<TicketRequest> => {
   return input as TicketRequest;
 };
 
-export const createTicketHandler =
-  (backend: TicketBackend, origins: readonly string[]) =>
-  async (request: Request): Promise<Response> => {
+export const createTicketHandler = (
+  backend: TicketBackend,
+  origins: readonly string[],
+) => {
+  const budget = createRequestBudget(240, 8);
+  return async (request: Request): Promise<Response> => {
     const origin = request.headers.get("origin");
     const headers = new Headers({
       "cache-control": "no-store",
@@ -117,6 +123,11 @@ export const createTicketHandler =
       return new Response(null, { status: 405, headers });
     }
     headers.set("content-type", "application/json");
+    const slot = budget.acquire();
+    if ("retryAfter" in slot) {
+      headers.set("retry-after", String(slot.retryAfter));
+      return new Response(null, { status: 429, headers });
+    }
     try {
       const input = await readInput(request);
       const scope = await backend.authorize(input);
@@ -133,5 +144,8 @@ export const createTicketHandler =
         status: error instanceof RequestError ? error.status : 503,
         headers,
       });
+    } finally {
+      slot.release();
     }
   };
+};

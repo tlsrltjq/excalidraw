@@ -775,6 +775,8 @@ D-012 결정에 따라 구현했다 (구글 시트/문서 버전 기록을 단�
 
 ## Milestone 8: 공동편집 Persistence 독립
 
+2026-10-14 자원 제한 첫 단위(D-030): 새 Supabase 파일 압축 해제를 4 MiB + 64 KiB에서 중단하고 Edge 파일/ticket에 isolate별 요청 수/동시 처리 상한을 추가했다. 상한 초과·실패 슬롯 반환·정상 codec 호환을 검사한다. 운영 미배포/기본 flag off 유지. 남은 공개 전제는 DB 전역 scene/Storage 용량·분산 요청 quota, relay 전체 연결/송신 상한, 인프라 body/SQL parameter 로그 정책과 hosted 검증이다. 비용 상한 완성으로 표시하지 않는다.
+
 2026-10-14 입장 통합 단위: D-028의 flag-gated 선택 화면/controller/Portal/session/Supabase provider 연결을 구현했다. ACK와 snapshot 준비 전 원본 유지, 실패 rollback, 개인 drawing 분리, 초기 peer queue, reconnect reconcile, read-only 및 계정/route/stop cleanup을 검사했다. 기본 flag off/운영 미배포를 유지한다. 새 방 생성/초대 관리 UI와 공개 abuse·inflate 메모리·로그 제한/hosted 데이터·두 클라이언트 검증은 남아 있다.
 
 2026-10-14 프론트 세션 단위: ticket request와 challenge/ACK/자동 갱신/만료·재연결 worker를 작성했다(D-027). 실제 relay와 동일 worker의 입장·갱신·read 상태를 확인했다. 기존 startCollaboration이 ACK 전에 canvas reset/Firebase fallback을 하는 경계를 유지하며 새 worker를 아직 UI/controller에 붙이지 않았다. 다음은 ACK 후 remote scene 준비·원본 보존·read-only viewMode/provider 수명주기 통합이다.

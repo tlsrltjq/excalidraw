@@ -15,6 +15,8 @@
 
 ## 지금 어디까지 왔나
 
+Milestone 8 자원 제한 첫 단위 (2026-10-14): `codex/collab-resource-limits`에서 새 Supabase 파일의 압축 해제 중단 상한과 Edge 파일·ticket의 인스턴스별 요청/동시 처리 제한을 구현했다(D-030). 운영에는 적용하지 않았다. 다음은 DB가 강제하는 프로젝트 총 저장량·분산 요청 quota와 relay 연결/전송 제한·인프라 로그 검토다. 이 단위만으로 무료 사용량/공개 abuse 보호가 완성됐다고 보지 않으며 운영 flag off를 유지한다.
+
 Milestone 8 소유자 방 관리 (2026-10-14): `codex/collab-room-management`에 내 협업 방 메뉴/빈 방 생성, 편집·읽기 전용 초대, 1시간·1일·7일 만료, 복사·폐기·키 복구·부분 실패 재시도를 구현했다. 기본 off flag와 운영 Firebase는 유지한다. 새 캔버스를 자동 열거나 현재 개인 그림을 복사하지 않는다. 다음은 공개 rate/용량·로그/메모리 제한을 마무리하고 미적용 DB/Edge/relay를 순서대로 적용해 실제 두 클라이언트로 확인하는 단계다. 사용 방법은 operations, 검증/미확인은 VALIDATION 최신 기록을 따른다.
 
 Milestone 8 입장 화면/controller 연결 (2026-10-14): `codex/collab-entry-integration`에서 선택→입장 ACK→Supabase scene 준비→캔버스 전환을 연결했다. 초기 실패/취소에는 기존 scene/files/개인 그림 연결을 보존하며 초기 peer 업데이트를 bounded queue로 병합한다. 재연결 병합·읽기 전용 잠금·저장/파일/포인터/follow 전송 방어와 종료 cleanup을 구현했다. **`VITE_COLLAB_SUPABASE_ENABLED`는 기본 off이며 운영에 켜지 않았다.** 다음은 사용자용 새 방 생성/초대 관리, 공개 활성화 전 용량·로그·rate 제한 및 hosted DB/Edge/relay 적용·두 실제 클라이언트 검증이다. 결과와 생략은 VALIDATION 최신 기록을 따른다.

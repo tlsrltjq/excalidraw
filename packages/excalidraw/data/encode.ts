@@ -1,4 +1,4 @@
-import { deflate, inflate } from "pako";
+import { deflate, inflate, Inflate } from "pako";
 
 import { encryptData, decryptData } from "./encryption";
 
@@ -359,13 +359,51 @@ const _decryptAndDecompress = async (
   decryptedBuffer: Uint8Array<ArrayBuffer>,
   decryptionKey: string,
   isCompressed: boolean,
+  maxDecompressedBytes?: number,
 ) => {
   decryptedBuffer = new Uint8Array(
     await decryptData(iv, decryptedBuffer, decryptionKey),
   );
 
   if (isCompressed) {
+    if (maxDecompressedBytes !== undefined) {
+      const inflater = new Inflate({ chunkSize: 16384 });
+      const chunks: Uint8Array[] = [];
+      let length = 0;
+      let finished = false;
+      inflater.onData = (chunk) => {
+        if (!(chunk instanceof Uint8Array)) {
+          throw new Error("Unexpected decompression output");
+        }
+        length += chunk.byteLength;
+        if (length > maxDecompressedBytes) {
+          throw new Error("Decompressed data exceeds limit");
+        }
+        chunks.push(chunk);
+      };
+      inflater.onEnd = (status) => {
+        finished = status === 0;
+      };
+      inflater.push(decryptedBuffer, true);
+      if (!finished) {
+        throw new Error("Invalid compressed data");
+      }
+      const output = new Uint8Array(length);
+      let offset = 0;
+      for (const chunk of chunks) {
+        output.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      return output;
+    }
     return inflate(decryptedBuffer);
+  }
+
+  if (
+    maxDecompressedBytes !== undefined &&
+    decryptedBuffer.byteLength > maxDecompressedBytes
+  ) {
+    throw new Error("Decompressed data exceeds limit");
   }
 
   return decryptedBuffer;
@@ -373,8 +411,15 @@ const _decryptAndDecompress = async (
 
 export const decompressData = async <T extends Record<string, any>>(
   bufferView: Uint8Array,
-  options: { decryptionKey: string },
+  options: { decryptionKey: string; maxDecompressedBytes?: number },
 ) => {
+  if (
+    options.maxDecompressedBytes !== undefined &&
+    (!Number.isSafeInteger(options.maxDecompressedBytes) ||
+      options.maxDecompressedBytes <= 0)
+  ) {
+    throw new Error("Invalid decompression limit");
+  }
   // first chunk is encoding metadata (ignored for now)
   const [encodingMetadataBuffer, iv, buffer] = splitBuffers(bufferView);
 
@@ -389,6 +434,7 @@ export const decompressData = async <T extends Record<string, any>>(
         buffer,
         options.decryptionKey,
         !!encodingMetadata.compression,
+        options.maxDecompressedBytes,
       ),
     );
 
@@ -403,10 +449,12 @@ export const decompressData = async <T extends Record<string, any>>(
       data: contentsBuffer,
     };
   } catch (error: any) {
-    console.error(
-      `Error during decompressing and decrypting the file.`,
-      encodingMetadata,
-    );
+    if (options.maxDecompressedBytes === undefined) {
+      console.error(
+        `Error during decompressing and decrypting the file.`,
+        encodingMetadata,
+      );
+    }
     throw error;
   }
 };

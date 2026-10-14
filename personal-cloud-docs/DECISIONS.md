@@ -1,5 +1,13 @@
 # 설계 결정 기록
 
+## D-030: 파일 압축 해제와 Edge 처리 자원 상한
+
+- 이번 단위: 새 Supabase 파일 복원의 압축 해제 중단 한도(4 MiB 데이터 + 64 KiB 메타데이터/래퍼), Edge 파일 120회/분·동시 3개, ticket 240회/분·동시 8개를 각 handler/isolate에 적용한다. 초과 요청은 body/권한/Storage/서명 처리 전에 429로 거부하고 Retry-After를 보낸다. Origin 제한/초대 권한 검사는 그대로 유지한다.
+- core 공개 decompressData는 전체 inflate 뒤에만 크기를 알 수 있다. app에서 codec를 복제하거나 암호화 형식을 바꾸는 대안은 upstream 호환 위험이 더 크므로 `packages/excalidraw/data/encode.ts`에 선택적 maxDecompressedBytes API만 추가한다. 지정하지 않은 Firebase/import/export 호출은 그대로다. 기존 pako streaming Inflate로 output 누적 시 즉시 중단한다. core 예외는 이 파일로 제한하고 upstream merge 때 optional API/기본 동작 회귀를 재검사한다. 새로운 dependency는 없다.
+- 상한 경로는 실패 시 인코딩 메타데이터/원문을 로그에 출력하지 않는다. 서버 limiter는 카운터만 보관하며 IP/계정/초대/proof를 기록하지 않는다. 슬롯은 finally에서 반환한다. isolate 재시작/스케일아웃으로 제한은 초기화/배수 증가할 수 있으므로 전역 abuse/월 비용 제한이라고 주장하지 않는다.
+- 완료 조건: 실제 AES/pako 파일 정상 복원, 경계값·고압축 oversized·비압축·실패 로그·이전 기본 codec 회귀, 요청 한도·회복·동시성·실패 슬롯 반환·CORS/권한 기존 검사, 타입/린트/빌드/guardrails(core 예외 명시). 프로젝트 총 Storage/scene 용량·분산 요청 quota/relay 연결 총량·인프라 로그 정책/hosted 검증은 다음 단위이며 이번에도 운영 flag off/미배포다.
+- streaming 근거: 기존 설치 pako 2.0.3 `lib/inflate.js`의 onData/onEnd를 확인하고 고정 크기 출력 callback을 사용했다. 일반 API 참고: https://nodeca.github.io/pako/ (현재 문서는 설치 버전과 다를 수 있으므로 실제 검증은 저장소 설치 버전으로 수행).
+
 ## D-029: 소유자 협업 방·초대 관리
 
 - 범위: Milestone 8의 기본 off flag 아래 로그인 소유자의 빈 방 생성/목록, read/write 초대 발급(1시간·1일·7일), 링크 복사, 폐기를 추가한다. 캔버스 복사나 자동 입장은 하지 않는다. 기존 개인 그림/Firebase/운영 설정은 유지한다.

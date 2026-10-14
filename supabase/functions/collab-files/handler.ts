@@ -1,3 +1,6 @@
+// @ts-ignore Deno requires explicit extensions; checked separately with deno check.
+import { createRequestBudget } from "../_shared/requestBudget.ts";
+
 export const MAX_FILE_BYTES = 4 * 1024 * 1024;
 const MAX_REQUEST_BYTES = 6 * 1024 * 1024;
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -104,9 +107,12 @@ const validate = (value: unknown): FileRequest => {
   return input as FileRequest;
 };
 
-export const createFileHandler =
-  (backend: FileBackend, allowedOrigins: readonly string[]) =>
-  async (request: Request): Promise<Response> => {
+export const createFileHandler = (
+  backend: FileBackend,
+  allowedOrigins: readonly string[],
+) => {
+  const budget = createRequestBudget(120, 3);
+  return async (request: Request): Promise<Response> => {
     const origin = request.headers.get("origin");
     const headers = new Headers({
       "cache-control": "no-store",
@@ -126,6 +132,11 @@ export const createFileHandler =
     }
     if (request.method !== "POST") {
       return new Response(null, { status: 405, headers });
+    }
+    const slot = budget.acquire();
+    if ("retryAfter" in slot) {
+      headers.set("retry-after", String(slot.retryAfter));
+      return new Response(null, { status: 429, headers });
     }
     try {
       const input = validate(await readBody(request));
@@ -177,5 +188,8 @@ export const createFileHandler =
         status: error instanceof RequestError ? error.status : 503,
         headers,
       });
+    } finally {
+      slot.release();
     }
   };
+};

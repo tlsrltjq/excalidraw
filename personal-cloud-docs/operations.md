@@ -14,6 +14,26 @@
 
 ## 노트북에서 다시 시작
 
+### 협업 자원 제한과 초과 대응 (미배포, 2026-10-14)
+
+| 범위 | 새 코드의 제한 | 한계 |
+| --- | --- | --- |
+| Supabase 협업 파일 | 암호문 4 MiB, 압축 해제 출력 4 MiB + 64 KiB(래퍼/메타데이터 포함), 최종 data 4 MiB | 일반 Firebase/import/export는 기존 기본 codec 유지. 이미지의 픽셀 디코딩 메모리까지 보장하지 않음 |
+| collab-files Edge | isolate당 120 POST/60초, 동시 3개 | 동시 초과는 1초 후 재시도; fixed window 초과는 남은 초를 Retry-After로 응답 |
+| collab-ticket Edge | isolate당 240 POST/60초, 동시 8개 | 갱신 실패 시 기존 worker는 fail-closed. 초대 입장을 나중에 다시 시도 |
+
+허용 Origin의 잘못된 POST도 요청 횟수에 포함하며 body를 읽기 전에 슬롯을 잡는다. CORS preflight/다른 Origin/지원하지 않는 method는 제한 카운터 밖에서 거부/응답한다. 정상·권한 거부·오류 후 슬롯은 반환한다. IP/계정/키/proof/body는 limiter에 저장하지 않고 인메모리 정수 카운터만 사용한다. 새 경로에서 codec 실패 메타데이터를 로그로 출력하지 않는다.
+
+429를 받으면 Retry-After 이상 기다린 뒤 실패한 파일/입장만 재시도한다. 자동 고속 재시도나 무제한 상한 증가로 해결하지 않는다. 압축 해제 한도 실패는 기다려도 해결되지 않으므로 파일을 작게 만들어 새 파일로 올린다. 실패 때문에 정상 개인 그림/로컬 초안을 지우지 않는다.
+
+이 카운터는 isolate가 재시작하면 초기화되고 여러 isolate에서는 배수로 증가한다. **프로젝트 전역·월 무료 사용량·비용 상한이 아니다.** 총 Storage/scene 용량과 분산 요청 quota·relay 연결 상한은 다음 개발 항목이며 적용 전 새 기능을 공개 활성화하지 않는다. Supabase/Render의 플랫폼 request-body/SQL parameter/에러 로그 정책은 아직 운영 검토가 필요하다. 운영 배포·요금 변경은 없다.
+
+core 예외 이유는 D-030을 따른다. 이 브랜치 검사는 `PERSONAL_CLOUD_ALLOW_CORE_CHANGES=1 node personal-cloud-harness/check-guardrails.mjs`로 실행한다. 커밋 hook에도 같은 일회용 환경을 사용하되 전역 설정/스크립트 자체를 완화하지 않는다. 예외 범위는 `packages/excalidraw/data/encode.ts`의 optional API뿐이다. Edge의 explicit `.ts` import는 앱 검사와 별도로 아래 Deno 검사도 실행한다.
+
+```bash
+docker run --rm --network none -v "$PWD:/workspace:ro" -w /workspace denoland/deno:alpine deno check supabase/functions/collab-files/index.ts supabase/functions/collab-ticket/index.ts
+```
+
 ### 내 협업 방 관리 (개발 기능, 2026-10-14)
 
 - `VITE_COLLAB_SUPABASE_ENABLED=true`인 개발 앱에서 로그인하면 메뉴의 `내 협업 방`을 열 수 있다. 운영에서는 아직 flag를 켜지 않는다. 아래 opt-in 실행 절차를 따른다. 메뉴가 보여도 운영 DB에 협업 migration이 미적용이면 요청은 실패한다.

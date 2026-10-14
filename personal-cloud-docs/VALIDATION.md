@@ -1,5 +1,12 @@
 # MVP 검증 기록
 
+## 2026-10-14 자원 제한 첫 단위
+
+- 변경: Supabase file loader/test의 압축 해제 상한, core `data/encode.ts`의 optional maxDecompressedBytes API(D-030 명시 예외), Edge shared requestBudget와 files/ticket handler, resourceLimits test, README/ROADMAP/DECISIONS/operations/검증 문서. core의 다른 파일/암호화 형식/dependency/schema/relay/운영 env/요금은 변경하지 않았다. 기존 기본 codec/Firebase 및 flag off 유지.
+- 신규 resourceLimits 16개, file loader 추가 1개 통과. 실제 AES-GCM/pako 2.0.3 정상/기본 복원 일치, 정확한 출력 경계(래퍼/메타 포함), 8 MiB→작은 암호문 공격의 조기 중단, 실제 gateway/file loader 실패 결과, 비압축 경계/잘린 압축 stream/잘못된 limit/실패 메타 로그 비출력, 요청 창 초기화/Retry-After·이중 release 안전성, 파일 3·ticket 8 동시 상한과 실패 슬롯 반환, malformed 요청 limit/OPTIONS 제외를 확인했다. byte 크기를 검사한 결과이며 브라우저 process RSS/CPU나 이미지 픽셀 디코드 전체 한도를 측정한 것은 아니다.
+- 전체 앱 검사 150파일: 2,155 passed / 47 skipped / 1 todo. 전체 code lint, 앱 typecheck, Docker network-none의 Deno 두 entrypoint 타입 검사, build/PWA precache 통과. 변경 코드 format/diff/guardrails는 core 일회용 예외 환경으로 검사한다. 기존 Node/MetaProperty/font/chunk/Browserslist 경고는 유지한다.
+- 생략: UI 변경이 없어 Safari 새 로그인/운영 데이터 생성·삭제/두 기기 검사는 하지 않았다. schema/relay 무변경으로 PostgreSQL/Socket 하네스 재실행 생략. 실제 hosted isolate 재시작/다중 인스턴스 요청·공개 부하·Storage 총량/분산 quota·relay 연결/송신 총량·provider 로그 정책은 미확인이다. 이번 카운터는 isolate 단위 backpressure이며 비용/월 사용량 또는 전역 abuse 보장을 하지 않는다. 운영 배포/flag 활성화 전 DB 전역 용량/분산 quota부터 이어서 구현한다.
+
 ## 2026-10-14 소유자 방·초대 관리
 
 - 변경: app RoomManagement UI/SCSS/test, cloud 로그인 메뉴와 App mount, owner SDK/test, README/ROADMAP/DECISIONS(D-029)/operations/검증 기록. core/dependency/schema/Edge/relay/운영 설정은 변경하지 않았다. 기본 off flag와 기존 Firebase 유지.

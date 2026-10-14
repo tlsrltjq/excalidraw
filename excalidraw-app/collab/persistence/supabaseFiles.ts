@@ -120,6 +120,7 @@ export const createSupabaseFiles = (
               const { data, metadata } =
                 await decompressData<BinaryFileMetadata>(bytes, {
                   decryptionKey,
+                  maxDecompressedBytes: FILE_UPLOAD_MAX_BYTES + 64 * 1024,
                 });
               check();
               if (
