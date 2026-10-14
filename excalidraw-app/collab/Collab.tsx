@@ -84,6 +84,7 @@ import { resetBrowserStateVersions } from "../data/tabSync";
 import { collabErrorIndicatorAtom } from "./CollabError";
 import Portal from "./Portal";
 import { collabPersistence } from "./persistence";
+import { needsCollabEntry } from "./persistence/entryRoute";
 
 import type {
   SocketUpdateDataSource,
@@ -479,6 +480,12 @@ class Collab extends PureComponent<CollabProps, CollabState> {
   startCollaboration = async (
     existingRoomLinkData: null | { roomId: string; roomKey: string },
   ) => {
+    if (
+      needsCollabEntry(window.location.href) ||
+      (existingRoomLinkData && /^sc_/i.test(existingRoomLinkData.roomId))
+    ) {
+      throw new Error("새 협업 방 연결을 아직 사용할 수 없습니다.");
+    }
     if (!this.state.username) {
       import("@excalidraw/random-username").then(({ getRandomUsername }) => {
         const username = getRandomUsername();

@@ -30,6 +30,8 @@ node personal-cloud-harness/check-collab-scene.node-test.mjs
 
 ### 웹 앱 시작
 
+2026-10-14 개발 참고: 새 Supabase 초대 URL(`collabStorage=supabase`, `invite` UUID, `#room=sc_...,...`)에서는 로그인/게스트 선택 화면을 표시한다. 임의 실제 초대를 만들지 말고 전달받은 유효한 초대로 검사한다. 현재 운영 DB에는 협업 RPC migration이 미적용이라 서버 설정 오류가 날 수 있고, 권한 확인 성공 뒤에도 Storage/relay 준비 전 실제 접속은 하지 않는다. 기존 협업 링크와 Cloud Workspace는 기존 방식이다. OAuth 복귀 정보는 same-tab sessionStorage에 최대 5분 남고 소비/닫기/로그인 시작 실패 때 삭제된다. 비밀이 포함된 URL/Storage/RPC body를 문서나 화면 캡처에 노출하지 않는다.
+
 1. 터미널을 열고 저장소로 이동한다.
 
 ```bash

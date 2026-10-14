@@ -1,5 +1,13 @@
 # MVP 검증 기록
 
+## 2026-10-14 로그인/게스트 선택과 OAuth 복귀
+
+- 변경: CollabEntry TSX/SCSS/test, admission/entryRoute helpers/test, 실제 App 회귀 검사, App/Collab/Dashboard route 가드 및 invite namespace 입력 검사, 개인 계획/운영 문서. core/dependency/DB migration/실제 DB/relay/운영 env/배포는 변경하지 않았다.
+- 집중 검사 87개 통과: 기존 persistence 48, entryRoute 18, admission 7, 선택 화면 10, 실제 App 2, 기존 협업 2. single-flight, Strict Mode에서 클릭 전 무요청, guest/account client 분리, proof만 RPC 전송, 서버 권한/unknown scope 오류 비노출, OAuth origin만 전달/실패 시 복귀 제거, TTL·same-origin/path·일회용 복귀/다른 scene 보호, 실패 후 재시도, 닫기·계정 변경의 늦은 응답 차단, malformed/대소문자 marker 거부를 확인했다.
+- 실제 편집기 초기 새 route의 협업 flag false/소켓 무접속 및 Collab API 직접 시작 거부, canvas element 유지한 채 초대 열기/닫기 확인. RPC/Auth는 mock이며 운영 Auth/PostgREST 검사로 표기하지 않는다. 초대 검증 성공은 실제 room join을 실행하지 않는다.
+- 타입/전체 린트/빌드 통과 후 namespace/popstate 범위 보완을 집중 테스트/타입/scoped lint/빌드로 재확인했다. 가드레일/diff/변경 파일 format 통과. 로컬 127.0.0.1:3001 개발 서버 기동/HTTP 200을 확인했으며 화면 검증을 대체하지 않는다. 기존 Firebase config 미설정, MetaProperty, font/chunk/Browserslist/Node 경고 유지. 초기 env 타입 경고는 getClient에서 URL/key 존재를 확인해 수정했다.
+- 생략/남은 위험: 전체 앱 테스트, Safari/desktop·mobile 실화면 확인(Mac 잠금), 실제 Google OAuth 취소·새로고침/Storage 제한, 실제 hosted DB/게스트 HTTP, ticket/relay와 Storage/전체 adapter. sessionStorage는 같은 탭/같은 origin만 지원하고 이미 받은 key나 bytes를 회수하지 못한다. 새 방 생성/실시간 접속은 계속 비활성화하며 운영 migration 미적용 상태를 유지한다.
+
 ## 2026-10-13 초대 검증 RPC 및 scene 저장 서버
 
 - 변경: collaboration scene migration, `supabaseSceneStore.ts`/test, 로컬 DB bootstrap/rollback SQL/실행 하네스 및 계획/결정/실행 문서. core/dependency/기존 Firebase/운영 env/실제 Supabase/relay는 변경하지 않았다.

@@ -104,6 +104,8 @@ import { AppMainMenu } from "./components/AppMainMenu";
 import { Dashboard } from "./components/cloud/Dashboard";
 import { VersionHistory } from "./components/cloud/VersionHistory";
 import { CloudSaveStatus } from "./components/cloud/CloudSaveStatus";
+import { CollabEntry } from "./components/cloud/CollabEntry";
+import { needsCollabEntry } from "./collab/persistence/entryRoute";
 import {
   flushAutosave,
   getCurrentFileManager,
@@ -258,6 +260,9 @@ const initializeScene = async (opts: {
     appState: restoreAppState(localDataState?.appState, null),
   };
 
+  if (needsCollabEntry(window.location.href)) {
+    return { scene, isExternalScene: false };
+  }
   let roomLinkData = getCollaborationLinkData(window.location.href);
   const isExternalScene = !!(id || jsonBackendMatch || roomLinkData);
   if (isExternalScene) {
@@ -419,7 +424,10 @@ const ExcalidrawWrapper = () => {
   const [, setShareDialogState] = useAtom(shareDialogStateAtom);
   const [collabAPI] = useAtom(collabAPIAtom);
   const [isCollaborating] = useAtomWithInitialValue(isCollaboratingAtom, () => {
-    return isCollaborationLink(window.location.href);
+    return (
+      !needsCollabEntry(window.location.href) &&
+      isCollaborationLink(window.location.href)
+    );
   });
   const collabError = useAtomValue(collabErrorIndicatorAtom);
   const userToFollow = useAtomValue(userToFollowAtom);
@@ -583,15 +591,20 @@ const ExcalidrawWrapper = () => {
       initialStatePromiseRef.current.promise.resolve(data.scene);
     });
 
-    const onHashChange = async (event: HashChangeEvent) => {
+    const onHashChange = async (event: Event) => {
       event.preventDefault();
       const libraryUrlTokens = parseLibraryTokensFromUrl();
       if (!libraryUrlTokens) {
         if (
           collabAPI?.isCollaborating() &&
-          !isCollaborationLink(window.location.href)
+          (!isCollaborationLink(window.location.href) ||
+            needsCollabEntry(window.location.href))
         ) {
           collabAPI.stopCollaboration(false);
+        }
+        if (needsCollabEntry(window.location.href)) {
+          excalidrawAPI.updateScene({ appState: { isLoading: false } });
+          return;
         }
         excalidrawAPI.updateScene({ appState: { isLoading: true } });
 
@@ -693,13 +706,20 @@ const ExcalidrawWrapper = () => {
       }
     };
 
+    const onEntryPopState = (event: PopStateEvent) => {
+      if (needsCollabEntry(window.location.href)) {
+        void onHashChange(event);
+      }
+    };
     window.addEventListener(EVENT.HASHCHANGE, onHashChange, false);
+    window.addEventListener("popstate", onEntryPopState, false);
     window.addEventListener(EVENT.UNLOAD, onUnload, false);
     window.addEventListener(EVENT.BLUR, visibilityChange, false);
     document.addEventListener(EVENT.VISIBILITY_CHANGE, visibilityChange, false);
     window.addEventListener(EVENT.FOCUS, visibilityChange, false);
     return () => {
       window.removeEventListener(EVENT.HASHCHANGE, onHashChange, false);
+      window.removeEventListener("popstate", onEntryPopState, false);
       window.removeEventListener(EVENT.UNLOAD, onUnload, false);
       window.removeEventListener(EVENT.BLUR, visibilityChange, false);
       window.removeEventListener(EVENT.FOCUS, visibilityChange, false);
@@ -1121,6 +1141,7 @@ const ExcalidrawWrapper = () => {
         )}
 
         <Dashboard excalidrawAPI={excalidrawAPI} />
+        {!isCollabDisabled && <CollabEntry />}
         <VersionHistory excalidrawAPI={excalidrawAPI} />
         <CloudSaveStatus excalidrawAPI={excalidrawAPI} />
 

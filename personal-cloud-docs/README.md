@@ -15,6 +15,8 @@
 
 ## 지금 어디까지 왔나
 
+Milestone 8 입장 선택 화면 (2026-10-14): `codex/collab-entry-choice`에서 새 초대의 로그인/게스트 선택, RPC 권한 확인/오류 재시도, 같은 탭의 5분·일회용 OAuth 복귀를 연결했다. 게스트 client는 Workspace 로그인 세션과 분리한다. 기존 링크는 Firebase를 유지하고 새 route는 기존 소켓/그림 자동 열기로 우회하지 않는다. 초대 확인 성공은 실제 공동편집 연결 성공이 아니며 Storage/relay ticket/전체 adapter와 운영 DB 적용은 남아 있다. 집중 검사 87개와 타입/린트/빌드 검증, Safari 확인 여부는 VALIDATION을 따른다.
+
 Milestone 8 서버 scene 단위 (2026-10-13): `codex/collab-scene-rpc`에 owner room/초대 관리, 로그인·게스트 공통 proof 검증과 scene CAS SQL/RLS, 미연결 Supabase scene store를 구현했다. 일회용 PostgreSQL에서 권한 검사 28개/rollback/두 DB 연결 CAS 경쟁을 확인했고 집중 앱 테스트 50개를 통과했다. 운영 Supabase migration 적용·Storage·relay ticket·입장 선택 화면·provider 활성화는 아직 하지 않았다. 재현 방법은 operations의 일회용 협업 DB 검사에 있다.
 
 Milestone 8 후속 (2026-10-13): 사용자 요청으로 새 방은 로그인/게스트 선택 지원으로 설계했다(D-020). `codex/collab-invite-cas`에서 초대 route/proof 처리와 암호화 scene single-flight/CAS worker를 구현·검증했다. 기존 Firebase는 유지하며 새 방 입장 UI/gateway/DB/RLS/Storage/relay ticket은 아직 연결하지 않았다. 다음은 이 서버 측 권한·저장 구현과 선택 화면 연결이다.

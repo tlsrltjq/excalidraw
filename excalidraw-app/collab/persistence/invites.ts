@@ -55,7 +55,7 @@ export const parseCollabPersistenceRoute = (
     providers.length > 1 ||
     invites.length > 1 ||
     (providers.length === 0 &&
-      (invites.length > 0 || url.hash.startsWith("#room=sc_")))
+      (invites.length > 0 || /^#room=sc_/i.test(url.hash)))
   ) {
     throw new Error("Invalid collaboration route");
   }

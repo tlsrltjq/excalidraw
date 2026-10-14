@@ -1,5 +1,12 @@
 # 설계 결정 기록
 
+## D-022: 초대 입장 선택 화면과 OAuth 복귀
+
+- 결정 (2026-10-14): 새 provider/초대/sc_ URL은 앱 초기화와 기존 Collab 시작에서 차단하고 로그인/게스트 선택 화면으로 보낸다. 잘못된 route도 기존 Firebase로 fallback하지 않는다. 초기 local scene은 유지하고 실행 중 URL 전환에서는 현재 canvas를 교체하지 않는다.
+- 게스트 검증에는 기존 Workspace 세션과 분리된 nonpersistent Supabase client를 사용한다. 로그인은 기존 세션 또는 Google OAuth를 사용하고 두 모드 모두 collab_check_invite RPC proof 검증을 받는다. 화면 선택값만으로 권한을 허용하지 않는다.
+- OAuth redirectTo는 origin뿐이다. 복귀 URL의 room key는 같은 탭 sessionStorage에 5분만 보관하고 로그인 완료 시 한 번 소비한다. 같은 origin/path와 검증된 초대 형식만 복원하고 외부 주소/만료/잘못된 값은 삭제한다. 다른 문서/공유 링크를 보고 있으면 자동 복귀하지 않는다. storage 실패나 OAuth 오류를 알리고 키/본문은 로그로 남기지 않는다.
+- 완료 조건: 선택/검사/오류/재시도/닫기 화면, URL·auth 전환/느린 응답 무효화, 로그인 복귀 검사, 실제 App 회귀/기본 타입·린트·빌드. 이번에는 RPC 검증 성공을 방 접속 성공으로 표시하지 않는다. DB 운영 적용, Storage와 전체 adapter, relay ticket 구현 전 새 협업 시작은 계속 잠근다.
+
 ## D-021: 초대 검증 RPC와 scene CAS 서버 경계
 
 - 결정 (2026-10-13): 별도 유료 gateway 대신 Supabase PostgreSQL RPC가 scene 요청마다 room/invite/proof hash/만료/폐기/scope를 검사한다. 로그인/게스트 모두 동일한 bearer 초대 검증을 거치며 로그인만으로 타인의 방 권한을 얻지 않는다.

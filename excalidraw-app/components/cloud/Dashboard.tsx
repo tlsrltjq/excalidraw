@@ -42,6 +42,7 @@ import {
 } from "../../cloud/currentDrawing";
 import { getDrawingIdFromUrl } from "../../cloud/urlDrawingId";
 import { loadCloudDrawingFromUrl } from "../../cloud/urlDrawingLoader";
+import { needsCollabEntry } from "../../collab/persistence/entryRoute";
 
 import {
   createFolder,
@@ -124,6 +125,7 @@ export const Dashboard: React.FC<Props> = ({ excalidrawAPI }) => {
   // editor is ready.
   useEffect(() => {
     if (
+      needsCollabEntry(window.location.href) ||
       !excalidrawAPI ||
       readyEditor !== excalidrawAPI ||
       status !== "signed-in"

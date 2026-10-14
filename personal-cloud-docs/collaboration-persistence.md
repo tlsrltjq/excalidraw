@@ -55,11 +55,22 @@ Portal -> 암호화된 실시간 메시지 -> 개인 relay
 
 ## 완료 상태
 
+### 입장 선택 화면 (2026-10-14, D-022)
+
+`components/cloud/CollabEntry.tsx`에서 사용자 선택 후 `admission.ts`의 collab_check_invite RPC를 호출한다. 게스트는 persistSession/autoRefresh/detectSessionInUrl이 모두 꺼진 별도 client이며 기존 계정 JWT를 공유하지 않는다. 로그인 계정도 proof가 필요하다. scope/오류만 표시하고 RPC 본문/키는 출력하지 않는다. Strict Mode mount에서는 요청하지 않고 버튼 single-flight, route/account 변경과 unmount에 generation 검사를 사용한다.
+
+Google OAuth는 origin으로만 돌아온다. `entryRoute.ts`가 검증된 같은-origin/path 초대 URL을 same-tab sessionStorage에 5분 보관하고 로그인 후 빈 root route일 때 한 번 소비한다. 다른 drawing/json/library route를 대체하지 않는다. 게스트 요청에는 OAuth를 수행하지 않고 로그인 오류/닫기에 pending return을 제거한다. 브라우저 저장소를 사용하지 못하면 오류를 표시한다.
+
+App 초기화/새 route hash·popstate/Collab 직접 시작/Dashboard 자동 drawing 열기에 우회 방어를 추가했다. 초기 local scene은 정상 복원하며 실행 중 canvas와 닫기 동작은 현재 내용을 유지한다. 대소문자가 잘못된 sc_ marker와 unknown provider도 기존 링크로 fallback하지 않는다. 정상 기존 링크는 변경하지 않는다.
+
+현재 초대 검증 성공 시 편집/읽기 전용 권한 확인만 표시하고 '공동편집 연결을 아직 사용할 수 없습니다'로 안내한다. 실제 입장 callback/socket 연결은 Storage/adapter/relay auth 준비 전 넣지 않는다. 운영 migration 적용/입장 ticket/실제 Google OAuth 검사는 미완료다.
+
 - [x] CollabPersistence interface와 Firebase adapter
 - [x] controller 연결과 집중 회귀 검사 (adapter 8개/협업 2개, typecheck/lint/build/guardrails)
 - [x] 사용자 결정: 로그인/게스트 선택 지원, client invite route/proof/hash 기반
 - [x] 암호화 scene CAS worker/single-flight/stale 결과/충돌·offline 테스트
-- [ ] 실제 로그인/게스트 선택 화면과 gateway 입장 처리
+- [x] 로그인/게스트 선택 화면, 초대 권한 RPC 확인, 같은 탭 OAuth 복귀 (실서비스 OAuth 미검증)
+- [ ] relay ticket 포함 실제 공동편집 입장 처리
 - [ ] Supabase 권한/route/CAS 최종 설계
 - [x] scene 초대 검증/owner 관리/CAS migration 및 RPC store 작성, 로컬 PostgreSQL 권한·경쟁 검증 (운영 미적용)
 - [ ] DB/Storage migration과 Supabase adapter
