@@ -47,7 +47,10 @@ type SceneSave = {
   isCurrent(): boolean;
 };
 
-const decode = async (scene: EncryptedScene, roomKey: string) => {
+export const decodeEncryptedCollabScene = async (
+  scene: EncryptedScene,
+  roomKey: string,
+) => {
   if (
     scene.iv.byteLength !== 12 ||
     scene.ciphertext.byteLength < 16 ||
@@ -91,7 +94,9 @@ export const createEncryptedSceneWriter = (store: EncryptedSceneStore) => {
       ) {
         throw new Error("Invalid collaboration revision");
       }
-      const remote = previous ? await decode(previous, input.roomKey) : [];
+      const remote = previous
+        ? await decodeEncryptedCollabScene(previous, input.roomKey)
+        : [];
       check();
       const reconciled = getSyncableElements(
         reconcileElements(
@@ -120,7 +125,7 @@ export const createEncryptedSceneWriter = (store: EncryptedSceneStore) => {
         if (result.revision !== (previous?.revision ?? 0) + 1) {
           throw new Error("Invalid collaboration revision");
         }
-        const elements = await decode(scene, input.roomKey);
+        const elements = await decodeEncryptedCollabScene(scene, input.roomKey);
         check();
         return { elements, revision: result.revision };
       }

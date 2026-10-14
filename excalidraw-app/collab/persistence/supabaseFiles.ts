@@ -38,7 +38,7 @@ export const createSupabaseFiles = (
   ) => {
     check();
     if (
-      prefix !== prefixForRoom ||
+      (prefix !== prefixForRoom && prefix !== prefixForRoom.slice(1)) ||
       !/^[A-Za-z0-9_-]{1,128}$/.test(id) ||
       (action === "upload" &&
         (!buffer?.byteLength || buffer.byteLength > FILE_UPLOAD_MAX_BYTES))

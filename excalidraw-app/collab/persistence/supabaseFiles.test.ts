@@ -200,6 +200,15 @@ it("rejects ciphertext moved under a different file ID", async () => {
   expect(loaded.erroredFiles.get(other)).toBe(true);
 });
 
+it("accepts the controller's slashless load prefix", async () => {
+  const { files, prefix } = setup();
+  await files.saveFiles({ prefix, files: await fixture() });
+  expect(
+    (await files.loadFiles(prefix.slice(1), invite.roomKey, [id]))
+      .loadedFiles[0].id,
+  ).toBe(id);
+});
+
 it("does not return slow download results after the room generation changes", async () => {
   let current = true;
   const { files, prefix, backend } = setup(() => current);

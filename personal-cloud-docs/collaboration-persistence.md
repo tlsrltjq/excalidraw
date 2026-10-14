@@ -91,7 +91,20 @@ App 초기화/새 route hash·popstate/Collab 직접 시작/Dashboard 자동 dra
 - [ ] relay ticket 포함 실제 공동편집 입장 처리
 - [ ] Supabase 권한/route/CAS 최종 설계
 - [x] scene 초대 검증/owner 관리/CAS migration 및 RPC store 작성, 로컬 PostgreSQL 권한·경쟁 검증 (운영 미적용)
-- [ ] DB/Storage migration과 Supabase adapter
+- [x] DB/Storage migration 및 Supabase adapter factory 작성 (운영 적용/실제 입장 연결 미완료)
 - [ ] encrypted scene/file 실기기 복구 및 운영 전환
 
-기본 adapter, client invite/CAS worker, scene 권한 SQL/RPC store까지 구현했다. 운영 DB 적용, 전체 Supabase persistence adapter/Storage/relay ticket/사용자 입장 선택 화면은 미완성이며 운영 전환도 하지 않았다.
+기본 adapter, client invite/CAS worker, scene 권한 SQL/RPC store, private 파일 프록시, 입장 선택 화면 및 통합 Supabase adapter factory를 구현했다. 운영 DB/함수 적용과 relay ticket/실제 입장 연결은 미완성이며 운영 전환도 하지 않았다.
+
+### 통합 adapter와 operation 경계 (2026-10-14, D-024)
+
+`supabase.ts`의 factory는 검증된 invite/client/scope와 필수 `isCurrent`를 받아 세션당 한 번 생성한다. scene writer queue와 private file helper를 공유하며 실제 복원/저장된 요소의 scene version만 socket별 WeakMap에 기록한다. 잘못된 room/key, stale 결과, 읽기 전용 scene 쓰기는 거부하고 Firebase fallback을 하지 않는다. 파일 prefix는 기존 controller의 slash 없는 load 경로와 slash 있는 save 경로만 정확히 허용한다.
+
+controller의 private persistence는 아직 Firebase다. room generation/provider/socket/id/key snapshot을 await 이후 확인하며 이전 응답을 scene/file/status/dialog에 적용하지 않는다. Portal도 암호화 이후 snapshot을 확인해 이전 암호문을 새 socket으로 보내지 않는다. 협업 종료 확인을 취소하면 generation을 무효화하지 않는다. FileManager는 reset generation을 확인해 이전 요청의 finally가 새 요청의 동일 file ID marker를 지우지 않도록 한다. 이미 서버에 전달된 쓰기 자체를 취소하는 보장은 아니다.
+
+- [x] 통합 Supabase adapter factory와 공유 파일 관리자/controller/Portal 경계
+- [ ] 실제 입장 시 provider 생성·선택 및 종료/계정 변경 수명주기 연결
+- [ ] relay ticket 서명·검증과 read scope의 편집 UI/전송 차단
+- [ ] hosted DB/Edge/Storage 적용과 두 실제 클라이언트 복원·재연결
+
+새 방 gate를 유지한다. 읽기 전용 adapter가 저장을 거부하는 것만으로 관찰자 편집/broadcast/종료 경고 동작을 완성한 것은 아니다. 공개 활성화 전 압축 해제 메모리 상한, rate/총 용량 및 인프라 요청 로그를 확인한다.

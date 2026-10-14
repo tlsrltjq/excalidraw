@@ -775,6 +775,8 @@ D-012 결정에 따라 구현했다 (구글 시트/문서 버전 기록을 단�
 
 ## Milestone 8: 공동편집 Persistence 독립
 
+2026-10-14 통합 adapter 단위: scene CAS/private 파일 factory와 socket별 실제 복원 scene version cache를 구현했다. controller/Portal operation snapshot 및 공유 FileManager reset generation으로 이전 방 응답/암호문/정리 작업이 새 방에 적용되지 않게 했다. Firebase 기본 provider와 새 방 잠금은 유지한다. 다음은 relay ticket/실제 입장 연결 및 읽기 전용 UI·broadcast 제한이며 운영 전환 전 메모리/rate/로그 제한도 남아 있다.
+
 2026-10-14 파일 단위: private bucket/프록시/client 파일 계약을 작성하고 원본 압축·암호화 bytes/metadata와 generation 방어를 확인했다. 실제 hosted Storage/새로고침·다른 기기 복구는 미확인이다. 전체 adapter/relay ticket/운영 적용 전 기존 Firebase 및 새 방 잠금은 유지한다.
 
 2026-10-14 입장 선택 단위: 로그인/게스트 화면, 분리된 guest client의 proof RPC 확인, local 5분·일회용 OAuth 복귀 구현. 미검증/잘못된 새 route는 Firebase에 연결하지 않고 canvas를 보존한다. 검증 성공 뒤에도 실제 새 방 접속은 잠금 상태다. 다음은 Storage/전체 adapter와 relay ticket 발급·검증이며 이후 운영 DB/실서비스 연결 검사와 활성화다.
@@ -785,7 +787,7 @@ D-012 결정에 따라 구현했다 (구글 시트/문서 버전 기록을 단�
 
 - [x] `CollabPersistence` interface 설계 및 controller 연결 (2026-10-13)
 - [x] 기존 Firebase adapter 작성, 집중 테스트 10개/typecheck/lint/build 통과
-- [ ] Supabase adapter 작성
+- [x] Supabase adapter factory 작성 (2026-10-14, runtime 선택/운영 연결은 미완료)
 - [ ] client-side encryption 유지
 - [ ] encrypted scene/file 저장
 - [x] 암호화 파일 private bucket/gateway/client 기반 구현 및 로컬 검사 (운영 미적용)

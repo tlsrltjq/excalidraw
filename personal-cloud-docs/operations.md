@@ -14,6 +14,8 @@
 
 ## 노트북에서 다시 시작
 
+2026-10-14 개발 상태: 통합 Supabase adapter는 구현됐으나 실제 입장/provider 선택에 미연결이다. 이번 단위는 DB migration, Edge 배포, Render/Vercel 설정 변경이나 재배포를 요구하지 않는다. 기존 Firebase 및 새 방 잠금은 유지한다. 서버 ticket/읽기 전용 전송 제한과 공개 활성화 전 메모리·rate·로그 점검을 먼저 완료한다. 상세 변경/검증은 collaboration-persistence와 VALIDATION의 최신 기록을 따른다.
+
 ### 일회용 협업 DB 검사 (2026-10-13)
 
 실제 운영 Supabase와 무관한 SQL 검사다. Docker Desktop을 실행한 뒤 저장소 루트에서 아래를 실행한다. Docker가 없거나 켜지지 않았으면 실패하므로 운영 DB로 대신 실행하지 않는다.

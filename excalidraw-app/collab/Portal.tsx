@@ -38,15 +38,19 @@ class Portal {
     this.socket = socket;
     this.roomId = id;
     this.roomKey = key;
+    const current = this.collab.captureRoomOperation();
 
     // Initialize socket listeners
     this.socket.on("init-room", () => {
-      if (this.socket) {
+      if (current() && this.socket) {
         this.socket.emit("join-room", this.roomId);
         trackEvent("share", "room joined");
       }
     });
     this.socket.on("new-user", async (_socketId: string) => {
+      if (!current()) {
+        return;
+      }
       this.broadcastScene(
         WS_SUBTYPES.INIT,
         this.collab.getSceneElementsIncludingDeleted(),
@@ -54,6 +58,9 @@ class Portal {
       );
     });
     this.socket.on("room-user-change", (clients: SocketId[]) => {
+      if (!current()) {
+        return;
+      }
       this.collab.setCollaborators(clients);
     });
 
@@ -87,10 +94,14 @@ class Portal {
     volatile: boolean = false,
     roomId?: string,
   ) {
+    const current = this.collab.captureRoomOperation();
     if (this.isOpen()) {
       const json = JSON.stringify(data);
       const encoded = new TextEncoder().encode(json);
       const { encryptedBuffer, iv } = await encryptData(this.roomKey!, encoded);
+      if (!current()) {
+        return;
+      }
 
       this.socket?.emit(
         volatile ? WS_EVENTS.SERVER_VOLATILE : WS_EVENTS.SERVER,
@@ -102,12 +113,16 @@ class Portal {
   }
 
   queueFileUpload = throttle(async () => {
+    const current = this.collab.captureRoomOperation();
     try {
       await this.collab.fileManager.saveFiles({
         elements: this.collab.excalidrawAPI.getSceneElementsIncludingDeleted(),
         files: this.collab.excalidrawAPI.getFiles(),
       });
     } catch (error: any) {
+      if (!current()) {
+        return;
+      }
       if (error.name !== "AbortError") {
         this.collab.excalidrawAPI.updateScene({
           appState: {
@@ -115,6 +130,10 @@ class Portal {
           },
         });
       }
+    }
+
+    if (!current()) {
+      return;
     }
 
     let isChanged = false;

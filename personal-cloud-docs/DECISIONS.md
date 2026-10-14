@@ -1,5 +1,14 @@
 # 설계 결정 기록
 
+## D-024: 통합 Supabase adapter와 controller operation 경계
+
+- 추가 확인: 공유 app FileManager를 reset 후 재사용하면 오래된 요청의 finally가 새 방의 같은 ID fetching/saving marker를 삭제할 수 있다. app helper에 reset generation을 추가해 stale 결과/정리/상태 통지를 차단한다. core는 바꾸지 않고 Cloud autosave/초안 회귀도 함께 실행한다. stop 확인 취소는 세션을 무효화하지 않는다.
+
+- 결정 (2026-10-14): scene CAS/store와 private 파일 계약을 하나의 CollabPersistence factory로 합친다. factory는 room/invite/scope와 현재 operation callback에 묶고 한 room session마다 한 번 생성한다. 기존 Firebase 기본 선택은 유지하며 controller의 private persistence instance 경계만 준비한다. relay ticket/운영 적용/새 방 시작은 후속이다.
+- cache는 socket별 복호화한 scene version을 사용해 기존 isSaved 계약을 유지한다. 오류/다른 room/key/stale 결과를 저장 성공으로 처리하지 않는다. read scope에서는 scene/file 쓰기를 요청하지 않고 명시 오류/파일 실패로 반환한다. 파일 load의 기존 slash 없는 prefix와 save의 slash prefix를 모두 정확히 허용하며 임의 경로 normalize는 하지 않는다.
+- controller와 Portal의 비동기 결과에는 room/key/socket/provider/generation snapshot을 적용한다. 시작/종료/소켓 파기/컴포넌트 종료로 generation을 무효화하고 await 후 현재 작업인지 확인한다. 이미 전송된 Firebase 최종 저장 자체를 취소하지 않으며 오래된 scene/file/status/error를 새 방에 적용하지 않는다.
+- 완료 조건: 통합 adapter scene/file/read-only/cache/실패·stale 테스트, 실제 편집기 controller 늦은 응답 검사, 관련 기존 회귀/타입/린트/빌드. 이 단위는 운영 Supabase 연결이나 실제 relay 입장 완료가 아니다. file inflate 중 메모리/rate 제한과 ticket 발급·relay 검증은 새 방 활성화 전 유지한다.
+
 ## D-023: 초대 검증 파일 프록시와 private bucket
 
 - 결정 (2026-10-14): Supabase Edge Function의 파일 프록시가 upload/download마다 기존 collab_check_invite로 proof/room/만료/폐기/scope를 검사한다. 게스트 때문에 이 새 함수만 플랫폼 JWT 검사 없이 호출할 수 있게 구성하되 내부 초대 검증은 필수다. 실제 배포/설정 변경은 이번 범위가 아니다.

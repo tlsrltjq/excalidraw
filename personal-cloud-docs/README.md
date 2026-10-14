@@ -15,6 +15,8 @@
 
 ## 지금 어디까지 왔나
 
+Milestone 8 통합 adapter 단위 (2026-10-14): `codex/collab-supabase-adapter`에서 scene CAS와 private 파일을 하나의 Supabase persistence factory로 묶었다. controller/Portal 및 공유 FileManager에 방 전환/reset 이후 늦은 응답·정리 작업을 차단하는 경계를 추가했다. 기본 provider는 Firebase이며 새 방 실제 입장/운영 DB·함수 적용은 아직 하지 않았다. 다음은 relay ticket 발급·검증과 실제 입장 연결, 읽기 전용 UI/전송 제한이다. 검증 범위와 남은 위험은 VALIDATION의 최신 기록을 따른다.
+
 Milestone 8 private 파일 단위 (2026-10-14): `codex/collab-private-files`에서 collab-files private bucket/RLS migration, 매 요청 초대를 검사하는 Edge 파일 프록시와 client save/load를 구현했다. 기존 encoder/decoder로 암호문 복원·부분 실패·재시도·다른 room/key·stale 결과를 검사했다. 집중 앱 테스트 118개, 로컬 Storage 정책 11항목 및 기존 scene 28항목/경쟁 검사, Deno 타입 검사를 통과했다. 운영 DB/함수 배포/기본 provider 연결은 아직 하지 않았고 다음은 전체 Supabase adapter와 relay ticket 연결이다.
 
 Milestone 8 입장 선택 화면 (2026-10-14): `codex/collab-entry-choice`에서 새 초대의 로그인/게스트 선택, RPC 권한 확인/오류 재시도, 같은 탭의 5분·일회용 OAuth 복귀를 연결했다. 게스트 client는 Workspace 로그인 세션과 분리한다. 기존 링크는 Firebase를 유지하고 새 route는 기존 소켓/그림 자동 열기로 우회하지 않는다. 초대 확인 성공은 실제 공동편집 연결 성공이 아니며 Storage/relay ticket/전체 adapter와 운영 DB 적용은 남아 있다. 집중 검사 87개와 타입/린트/빌드 검증, Safari 확인 여부는 VALIDATION을 따른다.
@@ -43,7 +45,7 @@ Milestone 8 첫 단위 구현 완료 (2026-10-13): `codex/collab-persistence-ada
 
 2026-10-04 빈 캔버스 재현 기록은 보존하며 D-016 수정/2026-10-09 검증으로 후속 처리했다. 서버 데이터 삭제/유출을 확정한 결과는 아니다. Safari URL 통신 실패와 실제 두 계정 Storage 격리도 확인했다. 강제 종료/eviction, 실제 JWT metadata 쓰기/서명 URL 등은 남아 있다.
 
-다시 시작할 때는 이 문서 → ROADMAP의 Milestone 7 → collaboration/VALIDATION의 최신 기록을 읽고, 실행이 필요하면 operations.md를 따른다. Milestone 6 심화 검사는 보류 상태로 유지한다.
+다시 시작할 때는 이 문서 → ROADMAP의 Milestone 8 → collaboration-persistence/VALIDATION의 최신 기록을 읽고, 실행이 필요하면 operations.md를 따른다. Milestone 6 심화 검사는 보류 상태로 유지한다.
 
 제품 변경은 `codex/cloud-file-save-status`의 `1a246109`로 커밋/push하고 `personal-cloud`에 fast-forward 통합/push했다. `737c21a8`(scene 저장 실패 복구 회귀 검사), `0387136c`(이미지 초안/백업)도 포함된다. GitHub Production 배포 success 및 운영 `version.json`의 `1a24610` 일치를 확인했다. Preview 화면은 Vercel 로그인 보호로 미확인이다. 배포 결과 문서는 `f4a6f006`으로 기능 브랜치에 후속 커밋했다. 현재 개발 브랜치는 `codex/personal-collaboration-server`이며 새 협업 서버/하네스/문서 수정은 아직 미커밋이다. 문서 후속 commit이나 로컬 서버 실행을 운영 협업 서버 전환과 혼동하지 않는다.
 

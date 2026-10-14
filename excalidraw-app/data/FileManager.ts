@@ -1,5 +1,6 @@
 import { CaptureUpdateAction } from "@excalidraw/excalidraw";
 import { compressData } from "@excalidraw/excalidraw/data/encode";
+import { AbortError } from "@excalidraw/excalidraw/errors";
 import { newElementWith } from "@excalidraw/element";
 import { isInitializedImageElement } from "@excalidraw/element";
 import { t } from "@excalidraw/excalidraw/i18n";
@@ -20,6 +21,7 @@ import type {
 type FileVersion = Required<BinaryFileData>["version"];
 
 export class FileManager {
+  private generation = 0;
   /** files being fetched */
   private fetchingFiles = new Map<ExcalidrawImageElement["fileId"], true>();
   private erroredFiles_fetch = new Map<
@@ -96,6 +98,7 @@ export class FileManager {
     elements: readonly ExcalidrawElement[];
     files: BinaryFiles;
   }) => {
+    const generation = this.generation;
     const addedFiles: Map<FileId, BinaryFileData> = new Map();
 
     for (const element of elements) {
@@ -116,6 +119,9 @@ export class FileManager {
       const { savedFiles, erroredFiles } = await this._saveFiles({
         addedFiles,
       });
+      if (generation !== this.generation) {
+        throw new AbortError();
+      }
 
       for (const [fileId, fileData] of savedFiles) {
         this.savedFiles.set(fileId, this.getFileVersion(fileData));
@@ -130,8 +136,10 @@ export class FileManager {
         erroredFiles,
       };
     } finally {
-      for (const [fileId] of addedFiles) {
-        this.savingFiles.delete(fileId);
+      if (generation === this.generation) {
+        for (const [fileId] of addedFiles) {
+          this.savingFiles.delete(fileId);
+        }
       }
     }
   };
@@ -142,6 +150,7 @@ export class FileManager {
     loadedFiles: BinaryFileData[];
     erroredFiles: Map<FileId, true>;
   }> => {
+    const generation = this.generation;
     if (!ids.length) {
       return {
         loadedFiles: [],
@@ -155,7 +164,13 @@ export class FileManager {
     this._onFileStatusChange?.(ids.map((id) => [id, "loading"]));
 
     try {
+      if (generation !== this.generation) {
+        throw new AbortError();
+      }
       const { loadedFiles, erroredFiles } = await this._getFiles(ids);
+      if (generation !== this.generation) {
+        throw new AbortError();
+      }
 
       for (const file of loadedFiles) {
         this.savedFiles.set(file.id, this.getFileVersion(file));
@@ -173,8 +188,10 @@ export class FileManager {
 
       return { loadedFiles, erroredFiles };
     } finally {
-      for (const id of ids) {
-        this.fetchingFiles.delete(id);
+      if (generation === this.generation) {
+        for (const id of ids) {
+          this.fetchingFiles.delete(id);
+        }
       }
     }
   };
@@ -210,6 +227,7 @@ export class FileManager {
   };
 
   reset() {
+    this.generation++;
     if (this._onFileStatusChange && this.fetchingFiles.size) {
       this._onFileStatusChange(
         [...this.fetchingFiles.keys()].map(

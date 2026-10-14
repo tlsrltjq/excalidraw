@@ -1,5 +1,13 @@
 # MVP 검증 기록
 
+## 2026-10-14 통합 Supabase adapter와 방 전환 경계
+
+- 변경: `collab/persistence/supabase.ts`와 테스트, scene decoder export, 기존 파일 prefix 호환 검사, `Collab.tsx`/`Portal.tsx` 및 공유 `data/FileManager.ts`의 generation 방어와 관련 테스트, README/ROADMAP/DECISIONS/협업 저장 설계/operations/검증 문서. core/dependency/DB schema/Edge 함수/relay/운영 설정은 변경하지 않았다. 기본 provider는 Firebase이고 새 방 실제 입장은 여전히 비활성화다.
+- 집중 앱 검사 160개/18개 파일 통과. 실제 upstream 암호화·복원 codec과 편집기를 사용하며 Supabase RPC/Functions 및 Firebase backend는 mock이다. 통합 adapter 7개, 파일 prefix 호환 추가 1개, controller 이전 저장 결과/오류 무시·종료 취소 3개, Portal 느린 암호화 이후 다른 socket 전송 차단 2개, FileManager reset 후 동일 ID 새 fetch/save marker 보존 2개를 포함한다. 공유 helper 변경에 따른 기존 Cloud autosave/초안/내보내기 회귀 27개도 포함했다. 기존 충돌/offline/파일 부분 실패 검사를 함께 실행했다.
+- 최종 타입 검사와 빌드 통과. 테스트 fixture의 branded 요소/WS_SUBTYPES enum 타입 오류를 수정해 다시 검사했고 controller/Portal 5개를 재실행했다. 전체 code lint, guardrails(변경 파일 17개), diff 및 변경 코드 scoped formatting 통과. 로컬 앱 HTTP 200을 확인했으며 화면 검증을 대체하지 않는다. 기존 Firebase config undefined/MetaProperty/폰트·chunk·Browserslist/Node 경고는 유지한다.
+- 생략: 전체 앱 테스트, DB/Edge/relay 재검사(이번 변경 없음), Safari 화면 및 두 실제 클라이언트 편집·재연결, hosted Supabase/JWT/Storage/새로고침·다른 기기 복원. 이 단위는 UI/실제 입장/provider 선택을 연결하지 않았으므로 backend mock 검사를 운영 활성화 검사로 표기하지 않는다.
+- 남은 위험: 이미 서버에 전달된 write는 취소되지 않을 수 있다. 계정 변경/입장/provider 수명주기, relay ticket 발급·검증, 읽기 전용 편집 UI/broadcast/종료 경고 처리가 다음 연결 단계다. 압축 해제 메모리 상한, rate/총 용량, 인프라 header/body 로그 점검도 공개 활성화 전에 완료해야 한다. 운영 DB migration/Edge 배포/Render/Vercel 재배포나 유료 옵션 추가는 하지 않았다.
+
 ## 2026-10-14 private 협업 파일 기반
 
 - 변경: private collab-files bucket migration, 미배포 Edge config/handler/index, Supabase 파일 client/test, gateway test, 로컬 Storage schema/policy 검사와 기존 DB 하네스 확장, 정확한 server env lookup만 허용하는 guardrail 및 fixture 검사, 관련 docs. core/package/dependency/기존 provider/운영 env/DB/Storage/relay/배포는 변경하지 않았다. 실제 관리자 secret은 조회·저장·출력하지 않았다.
