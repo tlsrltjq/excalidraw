@@ -2,3 +2,8 @@
 # This function authenticates the invitation itself, including guest requests.
 # Do not deploy until the proof RPC and private bucket policies have been verified.
 verify_jwt = false
+
+[functions.collab-ticket]
+# Invitation proof, not account login, authorizes both guests and accounts.
+# Keep undeployed until relay challenge/expiry/scope enforcement is connected.
+verify_jwt = false

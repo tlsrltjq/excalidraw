@@ -14,6 +14,17 @@
 
 ## 노트북에서 다시 시작
 
+### 미배포 입장권 함수 검사 (2026-10-14)
+
+`collab-ticket` 함수도 아직 운영에 배포하지 않았다. 타입 확인은 운영 서비스나 secret 없이 아래처럼 실행한다.
+
+```bash
+docker run --rm --network none -v "$PWD:/workspace:ro" -w /workspace denoland/deno:alpine deno check supabase/functions/collab-ticket/index.ts
+yarn test:app --watch=false excalidraw-app/collab/persistence/relayTicket.test.ts
+```
+
+향후 발급기에 필요한 설정은 기존 `SUPABASE_URL`/`SUPABASE_ANON_KEY`, `COLLAB_ALLOWED_ORIGINS`, 서버 전용 `COLLAB_TICKET_PRIVATE_JWK`다. relay에는 P-256 공개 JWK만 배포한다. private JWK는 저장소/브라우저 VITE 변수/채팅/로그에 넣지 않는다. 이번 작업에서는 실제 키 생성·등록·배포를 수행하지 않았고 위 명령은 테스트 중 메모리에서 생성하는 키만 사용한다. `verify_jwt=false`는 게스트 초대 proof 검사 계약이지 무인증 입장 허용이 아니다. relay challenge/expiry/renewal/scope 처리와 rate/로그 점검 전 함수만 먼저 공개하지 않는다.
+
 2026-10-14 개발 상태: 통합 Supabase adapter는 구현됐으나 실제 입장/provider 선택에 미연결이다. 이번 단위는 DB migration, Edge 배포, Render/Vercel 설정 변경이나 재배포를 요구하지 않는다. 기존 Firebase 및 새 방 잠금은 유지한다. 서버 ticket/읽기 전용 전송 제한과 공개 활성화 전 메모리·rate·로그 점검을 먼저 완료한다. 상세 변경/검증은 collaboration-persistence와 VALIDATION의 최신 기록을 따른다.
 
 ### 일회용 협업 DB 검사 (2026-10-13)

@@ -1,5 +1,12 @@
 # 설계 결정 기록
 
+## D-025: relay 입장권 서명 계약
+
+- 결정 (2026-10-14): Web Crypto ECDSA P-256/SHA-256의 비대칭 서명을 사용한다. Edge 발급기만 private key를 보유하고 relay에는 public key만 둔다. 새로운 dependency 없이 플랫폼 crypto API를 사용하며 JWT로 위장하지 않는 고정 버전 envelope를 정의한다. 참고: https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/sign
+- 입장권은 issuer/audience/version, sc_ room, 서버 확인 read/write scope, 정확한 Origin, relay socket challenge, issued/expiry를 담는다. key/proof/invite ID/계정 정보는 담지 않는다. TTL은 60초 고정이며 relay는 수신 시와 모든 전달/입장 시 만료·room·Origin·challenge를 재검사해야 한다. challenge는 향후 relay가 socket마다 임의 발급하고, 재연결에는 새 입장권이 필요하다.
+- 이번 범위: 독립 signer/verifier와 제한된 Web Request 발급 handler, 초대 RPC를 호출하는 미배포 Edge entrypoint, 실제 crypto 기반 위조/다른 key/room/Origin/challenge/만료/권한/입력 검사. private JWK는 Edge env만 사용하고 잘못된 설정은 503으로 닫는다. service role은 필요 없다. key 배포, relay 연결 및 renewal/read-only 전송 제한은 후속이다. 미연결 단계에서 새 방 gate를 열지 않는다.
+- 완료 조건/위험: 발급기는 strict request allowlist/4 KiB stream/10초 읽기 제한/CORS/no-store/오류 비노출을 적용한다. 잘못된 scope나 초대 거부는 서명하지 않는다. 요청 및 ticket 원문을 로그에 남기지 않는다. 짧은 입장권만으로 즉시 초대 폐기를 보장하지 않으며 폐기 이후 최대 TTL까지 유효할 수 있다. 공개 활성화 전 주기적 재승인/전송 제한/rate/로그 정책을 완료한다.
+
 ## D-024: 통합 Supabase adapter와 controller operation 경계
 
 - 추가 확인: 공유 app FileManager를 reset 후 재사용하면 오래된 요청의 finally가 새 방의 같은 ID fetching/saving marker를 삭제할 수 있다. app helper에 reset generation을 추가해 stale 결과/정리/상태 통지를 차단한다. core는 바꾸지 않고 Cloud autosave/초안 회귀도 함께 실행한다. stop 확인 취소는 세션을 무효화하지 않는다.

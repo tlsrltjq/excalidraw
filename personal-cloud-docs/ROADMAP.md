@@ -775,6 +775,8 @@ D-012 결정에 따라 구현했다 (구글 시트/문서 버전 기록을 단�
 
 ## Milestone 8: 공동편집 Persistence 독립
 
+2026-10-14 입장권 기반: 고정 버전 ECDSA P-256 입장권 계약, verifier/issuer handler와 미배포 Edge entrypoint를 구현했다(D-025). 서명/위조/만료/room·Origin·challenge·scope 검사 및 요청 제한을 자동 확인했다. 다음은 별도 relay 저장소의 공개 키 검증/socket challenge/갱신/전송 권한 처리와 프론트 입장 연결이다. 아직 실시간 입장 보호가 적용된 운영 서비스는 아니다.
+
 2026-10-14 통합 adapter 단위: scene CAS/private 파일 factory와 socket별 실제 복원 scene version cache를 구현했다. controller/Portal operation snapshot 및 공유 FileManager reset generation으로 이전 방 응답/암호문/정리 작업이 새 방에 적용되지 않게 했다. Firebase 기본 provider와 새 방 잠금은 유지한다. 다음은 relay ticket/실제 입장 연결 및 읽기 전용 UI·broadcast 제한이며 운영 전환 전 메모리/rate/로그 제한도 남아 있다.
 
 2026-10-14 파일 단위: private bucket/프록시/client 파일 계약을 작성하고 원본 압축·암호화 bytes/metadata와 generation 방어를 확인했다. 실제 hosted Storage/새로고침·다른 기기 복구는 미확인이다. 전체 adapter/relay ticket/운영 적용 전 기존 Firebase 및 새 방 잠금은 유지한다.

@@ -1,5 +1,12 @@
 # MVP 검증 기록
 
+## 2026-10-14 relay 입장권 기반
+
+- 변경: `supabase/functions/collab-ticket/{ticket,handler,index}.ts`, 미배포 function config, `collab/persistence/relayTicket.test.ts`와 README/ROADMAP/DECISIONS/협업 저장/operations/검증 문서. core/dependency/DB/기존 controller/provider/별도 relay 저장소/운영 서비스·키 설정은 변경하지 않았다. 새 방 gate를 유지한다.
+- 집중 검사 67개/4파일 통과: 새 입장권 31개 + admission 7/통합 adapter 7/파일 gateway 22. 테스트에서 매번 생성한 P-256 키와 실제 Web Crypto sign/verify 및 Web Request/Response를 사용한다. backend 권한은 mock이고 실제 Supabase HTTP 인증 검사는 아니다. read/write 보존, proof/key 비포함, 60초 경계 만료·미래 발급, 다른 room/Origin/challenge/key, payload 변조 및 올바른 서명의 잘못된 issuer/audience/version/scope/TTL/추가 claim, 잘못된 입력/권한·요청 크기/읽기 timeout/Origin·method·content-type/preflight/오류 비노출을 확인했다.
+- 공식 Deno 이미지(network none, 저장소 readonly, host port 없음)에서 실제 Edge index check 통과. Entry RPC/fetch와 env 오류 경로는 타입 검사이며 실제 서버 실행/배포 검사는 아니다. 앱 타입·전체 lint·빌드와 변경 코드 scoped formatting 통과. 초기 테스트 HeadersInit 타입 오류는 fixture를 명시적인 문자열 map으로 고쳐 타입/빌드 및 입장권 31개를 재실행했다. 기존 Firebase config/MetaProperty/font/chunk/Browserslist/Node 경고는 유지한다. guardrails/diff 검사도 통과했다.
+- 생략/남은 위험: 전체 앱 테스트, 실제 Edge↔Supabase RPC, relay 적용/socket challenge 발급·재연결·갱신/읽기 전용 전달 권한, 브라우저 UI 및 두 실제 클라이언트, 운영 배포/secret 등록. 이미 발급된 ticket은 최대 60초 폐기 반영 지연이 있으며 즉시 퇴장을 보장하지 않는다. rate/총 용량/인프라 로그 제한과 키 회전·갱신 실패 정책은 활성화 전 후속이다. 무료 설정은 변경하지 않았다.
+
 ## 2026-10-14 통합 Supabase adapter와 방 전환 경계
 
 - 변경: `collab/persistence/supabase.ts`와 테스트, scene decoder export, 기존 파일 prefix 호환 검사, `Collab.tsx`/`Portal.tsx` 및 공유 `data/FileManager.ts`의 generation 방어와 관련 테스트, README/ROADMAP/DECISIONS/협업 저장 설계/operations/검증 문서. core/dependency/DB schema/Edge 함수/relay/운영 설정은 변경하지 않았다. 기본 provider는 Firebase이고 새 방 실제 입장은 여전히 비활성화다.

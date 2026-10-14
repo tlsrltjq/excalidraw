@@ -15,6 +15,8 @@
 
 ## 지금 어디까지 왔나
 
+Milestone 8 입장권 기반 (2026-10-14): `codex/collab-relay-ticket`에서 60초 ECDSA 입장권 signer/verifier, 제한된 HTTP 발급 handler와 초대 RPC를 사용하는 미배포 Edge entrypoint를 작성했다. relay에는 공개 키만 전달하는 계약이며 ticket은 room/Origin/socket challenge/read-write에 묶인다. 실제 relay 입장/갱신·읽기 전용 전송 제한과 프론트 연결은 다음이며 운영 배포/키 등록은 하지 않았다. 새 방 gate와 기본 Firebase는 유지한다.
+
 Milestone 8 통합 adapter 단위 (2026-10-14): `codex/collab-supabase-adapter`에서 scene CAS와 private 파일을 하나의 Supabase persistence factory로 묶었다. controller/Portal 및 공유 FileManager에 방 전환/reset 이후 늦은 응답·정리 작업을 차단하는 경계를 추가했다. 기본 provider는 Firebase이며 새 방 실제 입장/운영 DB·함수 적용은 아직 하지 않았다. 다음은 relay ticket 발급·검증과 실제 입장 연결, 읽기 전용 UI/전송 제한이다. 검증 범위와 남은 위험은 VALIDATION의 최신 기록을 따른다.
 
 Milestone 8 private 파일 단위 (2026-10-14): `codex/collab-private-files`에서 collab-files private bucket/RLS migration, 매 요청 초대를 검사하는 Edge 파일 프록시와 client save/load를 구현했다. 기존 encoder/decoder로 암호문 복원·부분 실패·재시도·다른 room/key·stale 결과를 검사했다. 집중 앱 테스트 118개, 로컬 Storage 정책 11항목 및 기존 scene 28항목/경쟁 검사, Deno 타입 검사를 통과했다. 운영 DB/함수 배포/기본 provider 연결은 아직 하지 않았고 다음은 전체 Supabase adapter와 relay ticket 연결이다.
