@@ -22,18 +22,25 @@ import {
   connectLocalAI,
   generateLocalDiagram,
   editLocalLabels,
+  extendLocalDiagram,
 } from "../../ai/client";
 import {
   applyLabelPreview,
   createLabelPreview,
   selectedLabelTargets,
 } from "../../ai/labelEditor";
+import {
+  applyStructurePreview,
+  createStructurePreview,
+  selectedStructureAnchor,
+} from "../../ai/structureEditor";
 
 import "./AIDiagram.scss";
 
 import type { CanvasSnapshot } from "../../ai/editor";
 import type { AISession } from "../../ai/client";
 import type { LabelPreview } from "../../ai/labelEditor";
+import type { StructurePreview } from "../../ai/structureEditor";
 
 export const aiDiagramOpenAtom = atom(false);
 const identity = () =>
@@ -56,6 +63,7 @@ const allowed = (api: ExcalidrawImperativeAPI) =>
 type Preview = (
   | (Awaited<ReturnType<typeof createDiagramPreview>> & { kind: "create" })
   | (LabelPreview & { kind: "labels" })
+  | (StructurePreview & { kind: "extend" })
 ) & {
   baseline: CanvasSnapshot;
   identity: string;
@@ -90,7 +98,14 @@ const AIDiagramBody = ({ api }: { api: ExcalidrawImperativeAPI }) => {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [previewURL, setPreviewURL] = useState("");
   const [backupExists, setBackupExists] = useState(false);
-  const [mode, setMode] = useState<"create" | "labels">("create");
+  const [mode, setMode] = useState<"create" | "labels" | "extend">("create");
+  const [anchor] = useState(() => {
+    try {
+      return selectedStructureAnchor(api);
+    } catch {
+      return null;
+    }
+  });
   const [selection] = useState(() => {
     try {
       return selectedLabelTargets(api);
@@ -190,7 +205,7 @@ const AIDiagramBody = ({ api }: { api: ExcalidrawImperativeAPI }) => {
   }, []);
 
   useEffect(() => {
-    if (!preview || preview.kind !== "create") {
+    if (!preview || preview.kind === "labels") {
       setPreviewURL("");
       return;
     }
@@ -213,7 +228,23 @@ const AIDiagramBody = ({ api }: { api: ExcalidrawImperativeAPI }) => {
     try {
       const baseline = captureCanvas(api);
       let result: Preview;
-      if (mode === "labels") {
+      if (mode === "extend") {
+        if (!anchor) {
+          throw new Error("기준 도형 한 개를 선택해주세요.");
+        }
+        const plan = await extendLocalDiagram(
+          session,
+          model,
+          prompt,
+          anchor.context,
+          request.signal,
+        );
+        if (!current() || operation !== generation.current) {
+          return;
+        }
+        const output = await createStructurePreview(api, plan, anchor);
+        result = { ...output, kind: "extend", baseline, identity: identity() };
+      } else if (mode === "labels") {
         const edit = await editLocalLabels(
           session,
           model,
@@ -292,7 +323,15 @@ const AIDiagramBody = ({ api }: { api: ExcalidrawImperativeAPI }) => {
           setBackupExists(true);
         }
       };
-      if (preview.kind === "labels") {
+      if (preview.kind === "extend") {
+        await applyStructurePreview(
+          api,
+          preview,
+          preview.baseline,
+          stillCurrent,
+          backup,
+        );
+      } else if (preview.kind === "labels") {
         await applyLabelPreview(
           api,
           preview,
@@ -354,6 +393,7 @@ const AIDiagramBody = ({ api }: { api: ExcalidrawImperativeAPI }) => {
           [
             ["create", "새 다이어그램"],
             ["labels", "선택 문구 수정"],
+            ["extend", "단계·연결 추가"],
           ] as const
         ).map(([value, title]) => (
           <button
@@ -410,6 +450,16 @@ const AIDiagramBody = ({ api }: { api: ExcalidrawImperativeAPI }) => {
           )}
         </div>
       )}
+      {mode === "extend" && (
+        <div className="personal-ai-diagram__targets">
+          <strong>기준 도형</strong>
+          {anchor ? (
+            <p>{anchor.context.label || anchor.context.kind}</p>
+          ) : (
+            <p role="status">기준 도형 한 개가 선택되지 않았습니다.</p>
+          )}
+        </div>
+      )}
       <label className="personal-ai-diagram__prompt">
         요청
         <textarea
@@ -417,7 +467,9 @@ const AIDiagramBody = ({ api }: { api: ExcalidrawImperativeAPI }) => {
           maxLength={2000}
           value={prompt}
           placeholder={
-            mode === "labels"
+            mode === "extend"
+              ? "선택한 단계 뒤에 재시도 단계와 연결을 추가해줘"
+              : mode === "labels"
               ? "선택한 문구를 짧은 한국어로 다듬어줘"
               : "로그인 → 인증 확인 → 성공 또는 오류 처리 흐름"
           }
@@ -441,7 +493,8 @@ const AIDiagramBody = ({ api }: { api: ExcalidrawImperativeAPI }) => {
             !prompt.trim() ||
             busy ||
             !current() ||
-            (mode === "labels" && !selection.length)
+            (mode === "labels" && !selection.length) ||
+            (mode === "extend" && !anchor)
           }
           onClick={generate}
         >
@@ -510,7 +563,11 @@ const AIDiagramBody = ({ api }: { api: ExcalidrawImperativeAPI }) => {
           disabled={!preview || busy || !current()}
           onClick={apply}
         >
-          {mode === "labels" ? "수정 적용" : "캔버스에 추가"}
+          {mode === "labels"
+            ? "수정 적용"
+            : mode === "extend"
+            ? "단계·연결 추가"
+            : "캔버스에 추가"}
         </button>
       </div>
     </div>

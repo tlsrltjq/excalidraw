@@ -3,6 +3,8 @@ import {
   parseDiagram,
   parseLabelEdit,
   parseLabelTargets,
+  parseDiagramExtension,
+  parseAnchorContext,
 } from "./schema";
 
 const diagram = () => ({
@@ -11,6 +13,47 @@ const diagram = () => ({
   direction: "TD",
   nodes: [{ id: "end", label: "Start", kind: "process" }],
   edges: [] as { from: string; to: string; label: string }[],
+});
+
+describe("additive diagram extension", () => {
+  const plan = {
+    version: 1,
+    title: "Retry",
+    direction: "TD",
+    nodes: [{ id: "n1", label: "Retry", kind: "process" }],
+    edges: [{ from: "s1", to: "n1", label: "Failure" }],
+  };
+  it("accepts a new step attached to the selected anchor", () => {
+    expect(parseDiagramExtension(plan)).toEqual(plan);
+    expect(
+      parseAnchorContext({ id: "s1", label: "Auth", kind: "decision" }).id,
+    ).toBe("s1");
+  });
+  it.each([
+    { ...plan, delete: ["s1"] },
+    { ...plan, nodes: [{ id: "s1", label: "Overwrite", kind: "process" }] },
+    { ...plan, nodes: [{ id: "real-id", label: "x", kind: "process" }] },
+    { ...plan, edges: [{ from: "s2", to: "n1", label: "" }] },
+    { ...plan, edges: [{ from: "n1", to: "n1", label: "" }] },
+    { ...plan, edges: [...plan.edges, ...plan.edges] },
+    { ...plan, edges: [] },
+    {
+      ...plan,
+      nodes: [...plan.nodes, { id: "n2", label: "Detached", kind: "process" }],
+    },
+    { ...plan, nodes: Array(13).fill(plan.nodes[0]) },
+    { ...plan, edges: Array(25).fill(plan.edges[0]) },
+  ])("rejects unsafe or disconnected additions %#", (value) =>
+    expect(() => parseDiagramExtension(value)).toThrow(),
+  );
+  it("rejects actual IDs and geometry in the context", () => {
+    expect(() =>
+      parseAnchorContext({ id: "actual-id", label: "Auth", kind: "process" }),
+    ).toThrow();
+    expect(() =>
+      parseAnchorContext({ id: "s1", label: "Auth", kind: "process", x: 1 }),
+    ).toThrow();
+  });
 });
 
 describe("selected label operation schema", () => {

@@ -1,5 +1,12 @@
 # 설계 결정 기록
 
+## D-035: 선택한 기준 도형에 AI 단계·연결 추가
+
+- 범위(2026-10-17): 사각형/다이아몬드/타원 한 개(또는 그 bound text)를 기준으로 새 단계와 연결만 추가한다. 모델에는 s1 alias, shape kind와 문구만 전달하고 실제 ID/좌표/선택 밖 정보/이미지는 보내지 않는다. 한 번에 새 노드 최대 12개, 연결 최대 24개. 기존-기존 연결/자기 연결/중복 연결/알 수 없는 alias/기준에서 떨어진 새 노드는 거부한다. 삭제·재배치·기존 문구 변경은 지원하지 않는다.
+- 새 extension DSL은 기존 Diagram validator와 Mermaid layout을 재사용하며 서버/client 경계에서 검증한다. /extend는 기존 Origin/Host/메모리 token/합산 분당 6회/단일 실행/취소/고정 Ollama endpoint를 유지한다. 새 도형은 전체 기존 그림의 오른쪽 바깥에 놓고 기존 도형 위치·크기는 바꾸지 않는다. 연결선이 기존 그림을 가로지를 수 있으므로 사용자가 실제 PNG 미리보기를 검토한다. 전체 graph 자동 배치/연결선 장애물 회피는 후속이다.
+- 기존 Scene을 건드리지 않는 임시 scene에서 core converter/outline snap/bind helper로 새 화살표의 양 끝 binding과 상호 boundElements를 만든다. 기존 기준 도형에는 새 arrow 참조만 추가하고 기존 ID/index/문구/geometry/다른 binding은 보존한다. 원본 객체 직접 변이·binding 필드 추측은 금지한다.
+- 완료 조건: alias/수량/연결성/금지 operation 검증, 실제 binding 상호성 및 이동 후 연결 유지, 기존 geometry/선택 밖/파일 보존, preview 중 원본 무변경, 문서/선택/scene 변경·backup 실패 거부, 한 번 undo/redo, UI·기존 생성/문구 수정 HTTP 회귀, 타입/린트/빌드/guardrails 및 Safari 합성 로컬 모델 적용. 적용 전 기존 문서별 백업을 공유하며 운영/유료 API/DB/core/dependency 변경은 없다.
+
 ## D-034: 선택한 텍스트의 로컬 AI 수정
 
 - 범위(2026-10-17): 생성 MVP에 선택 텍스트 수정 모드를 추가한다. 선택한 text 및 선택한 도형/화살표에 연결된 text만 대상이다. 원본 element ID 대신 요청 내 t1..t24 alias와 문구만 로컬 모델에 보낸다. 이미지/선택 밖 문구/계정/전체 scene은 전송하지 않는다. 생성 요청의 기존 계약은 유지한다.

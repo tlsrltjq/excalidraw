@@ -47,7 +47,10 @@ export const canvasMatches = (
   );
 };
 
-export const createDiagramPreview = async (diagram: Diagram) => {
+export const createDiagramElements = async (
+  diagram: Diagram,
+  regenerateIds = true,
+) => {
   const { parseMermaidToExcalidraw } = await import(
     "@excalidraw/mermaid-to-excalidraw"
   );
@@ -55,7 +58,9 @@ export const createDiagramPreview = async (diagram: Diagram) => {
   if (result.files && Object.keys(result.files).length) {
     throw new Error("Unsupported diagram files");
   }
-  const elements = convertToExcalidrawElements(result.elements);
+  const elements = convertToExcalidrawElements(result.elements, {
+    regenerateIds,
+  });
   if (
     !elements.length ||
     elements.length > 180 ||
@@ -71,6 +76,11 @@ export const createDiagramPreview = async (diagram: Diagram) => {
   ) {
     throw new Error("Unsupported diagram output");
   }
+  return elements;
+};
+
+export const createDiagramPreview = async (diagram: Diagram) => {
+  const elements = await createDiagramElements(diagram);
   const image = await exportToBlob({
     elements,
     files: {},

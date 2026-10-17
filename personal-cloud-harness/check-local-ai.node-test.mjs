@@ -338,3 +338,90 @@ test("label edits and generation share the same rate budget", async () => {
     }),
   );
 });
+
+test("extension validates anchor context, rejects forbidden operations and unknown references", async () => {
+  const anchor = { id: "s1", label: "Auth", kind: "decision" };
+  const extension = {
+    version: 1,
+    title: "Retry",
+    direction: "TD",
+    nodes: [{ id: "n1", label: "Retry", kind: "process" }],
+    edges: [{ from: "s1", to: "n1", label: "Failure" }],
+  };
+  await fixture(
+    async ({ request, calls }) => {
+      const { token } = await (await request("/session")).json();
+      assert.equal(
+        (
+          await request(
+            "/extend",
+            generation("wrong", {
+              model: "local:tiny",
+              prompt: "Add retry",
+              anchor,
+            }),
+          )
+        ).status,
+        403,
+      );
+      assert.equal(
+        (
+          await request(
+            "/extend",
+            generation(token, {
+              model: "local:tiny",
+              prompt: "Add retry",
+              anchor: { ...anchor, x: 3 },
+            }),
+          )
+        ).status,
+        422,
+      );
+      const response = await request(
+        "/extend",
+        generation(token, { model: "local:tiny", prompt: "Add retry", anchor }),
+      );
+      assert.equal(response.status, 200);
+      assert.deepEqual((await response.json()).extension, extension);
+      const body = JSON.parse(
+        calls.find((call) => call.url.endsWith("/chat")).body,
+      );
+      assert.deepEqual(JSON.parse(body.messages[1].content), {
+        instruction: "Add retry",
+        anchor,
+      });
+      assert.equal(body.tools, undefined);
+    },
+    async () => ({
+      done: true,
+      message: { content: JSON.stringify(extension) },
+    }),
+  );
+  for (const output of [
+    { ...extension, delete: ["s1"] },
+    { ...extension, edges: [{ from: "s2", to: "n1", label: "" }] },
+  ]) {
+    await fixture(
+      async ({ request }) => {
+        const { token } = await (await request("/session")).json();
+        assert.equal(
+          (
+            await request(
+              "/extend",
+              generation(token, {
+                model: "local:tiny",
+                prompt: "Add retry",
+                anchor,
+              }),
+            )
+          ).status,
+          422,
+        );
+      },
+      async () => ({
+        done: true,
+        message: { content: JSON.stringify(output) },
+      }),
+    );
+  }
+});

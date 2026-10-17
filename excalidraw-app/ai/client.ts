@@ -1,6 +1,12 @@
-import { parseDiagram, parseLabelEdit, parseLabelTargets } from "./schema";
+import {
+  parseDiagram,
+  parseLabelEdit,
+  parseLabelTargets,
+  parseAnchorContext,
+  parseDiagramExtension,
+} from "./schema";
 
-import type { LabelTarget } from "./schema";
+import type { LabelTarget, AnchorContext } from "./schema";
 
 const endpoint = "http://127.0.0.1:3004";
 export type AISession = { token: string; models: string[] };
@@ -87,4 +93,33 @@ export const editLocalLabels = async (
     );
   }
   return parseLabelEdit((await response.json()).edit, selection);
+};
+
+export const extendLocalDiagram = async (
+  session: AISession,
+  model: string,
+  prompt: string,
+  anchor: AnchorContext,
+  signal: AbortSignal,
+) => {
+  const response = await fetch(`${endpoint}/extend`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-personal-ai-token": session.token,
+    },
+    body: JSON.stringify({ model, prompt, anchor: parseAnchorContext(anchor) }),
+    signal,
+    credentials: "omit",
+    redirect: "error",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(
+      response.status === 403
+        ? "다시 연결해주세요."
+        : "추가할 구조를 만들지 못했습니다. 잠시 후 다시 시도해주세요.",
+    );
+  }
+  return parseDiagramExtension((await response.json()).extension);
 };

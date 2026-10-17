@@ -1,5 +1,15 @@
 # MVP 검증 기록
 
+## 2026-10-17 선택 도형의 AI 단계·연결 추가
+
+- 범위: `codex/ai-structure-additions`, D-035. 신규 `ai/structureEditor.ts`와 테스트, 기존 schema/client/preview helper/dialog·UI tests, loopback `/extend`와 HTTP tests, 개인 문서를 변경했다. core/dependency/DB/relay/운영 배포·요금은 바꾸지 않았다.
+- 앱 범위 `yarn test:app --watch=false excalidraw-app --minWorkers=1 --maxWorkers=2`: 38파일/367개 통과(신규 19개). alias/수량/중복·자기 연결/없는 참조/분리 노드/금지 필드, 선택한 기준 문구만 전송·명시적 적용, 실제 편집기 원본 불변성/기존 geometry·index·선택 밖 보존/상호 binding·이동 후 연결 유지/backup 실패·stale scene·선택·read-only/한 번 undo·redo를 확인했다. Mermaid 변환과 PNG는 단위 테스트에서 mock하며 아래 실제 Safari 결과로 보완했다.
+- loopback HTTP 하네스 `node --test personal-cloud-harness/check-local-ai.node-test.mjs`: 9개 통과. 기존 생성·문구 수정의 보안/예산/취소 회귀와 extension 입력 context·금지 출력/참조 거부를 검사했다. HTTP provider는 합성 mock이다.
+- `yarn test:typecheck`, 전체 `yarn test:code`, `yarn build` 및 guardrails/diff 검사 통과. 기존 Node MODULE_TYPELESS/DEP0169, MetaProperty lint·Firebase config/font/chunk/Browserslist 경고는 남아 있다. 최초 타입 검사에서 anchor type guard와 PNG의 nondeleted 타입을 보완한 뒤 재검사했다. 전체 upstream suite/운영 DB·두 계정·협업/모바일·다른 기기/실제 Cloud 저장·장애 주입은 변경 범위 밖으로 생략했다.
+- Safari 실제 확인: 비로그인 로컬 합성 아키텍처의 DB 사각형을 선택하고 설치된 `qwen3.5:9b`에 재시도 단계 한 개를 요청했다. 처음 생성이 거부돼 합성 직접 모델 진단을 수행했고 요청보다 많은 단계 및 분리 노드 생성 사례를 확인했다. 검증을 완화하지 않고 최소 추가/개수 준수 지시와 유효한 한 단계 예시를 보완했다. 이후 실제 `DB → 실패 → 재시도` PNG 미리보기·적용 성공, 기존 서버→DB 연결 보존, 한 번 undo로 추가 부분만 제거·redo 복원을 확인했다. 모델 품질/항상 성공은 보장하지 않는다.
+- 임시 증거: `/tmp/personal-excalidraw-ai-structure-preview.png`, `/tmp/personal-excalidraw-ai-structure-applied.png`. Git에 넣지 않는다. 이번 backup 다운로드/재가져오기는 생략하고 기존 IndexedDB/파일 포함 snapshot 자동 검사와 구분한다. 모델 11434/bridge 3004/앱 3006은 로컬 체험용으로 유지한다.
+- 한계: 기준 하나, frame 밖의 잠기지 않은 사각형/다이아몬드/타원만 지원한다. 새 노드만 배치하고 전체 그림 오른쪽에 추가하므로 기존 두 단계 사이 삽입/기존 연결 교체·삭제·재배치/장애물 회피는 하지 않는다. PNG는 기준과 추가 부분만 보여 기존 그림과의 교차를 전부 보여주지는 않는다. 대화 이력/원격 AI/운영 활성화는 후속이며 백업은 기존 AI와 문서별 마지막 하나를 공유한다.
+
 ## 2026-10-17 선택 문구 로컬 AI 수정
 
 - 범위: `codex/ai-label-editing`, D-034. 신규 `ai/labelEditor.ts`와 실제 편집기 테스트, 기존 AI schema/client/dialog/style/UI·schema test, loopback `/edit-labels`와 HTTP test, README/ROADMAP/DECISIONS/ai-gateway/operations/본 기록을 변경했다. 기존 생성 API/보안 경계·무료 로컬 전용을 유지하고 core/dependency/DB/relay/운영 endpoint·요금은 변경하지 않았다.

@@ -238,3 +238,90 @@ export const parseLabelEdit = (
   });
   return { version: 1, changes };
 };
+
+export type AnchorContext = {
+  id: "s1";
+  label: string;
+  kind: Diagram["nodes"][number]["kind"];
+};
+export const parseAnchorContext = (value: unknown): AnchorContext => {
+  const anchor = object(value, ["id", "label", "kind"]);
+  if (
+    anchor.id !== "s1" ||
+    !["process", "decision", "terminal"].includes(anchor.kind as string)
+  ) {
+    throw new Error("Invalid anchor");
+  }
+  return {
+    id: "s1",
+    label: label(anchor.label, 500, true),
+    kind: anchor.kind as AnchorContext["kind"],
+  };
+};
+export type DiagramExtension = Diagram;
+export const extensionSchema = {
+  ...diagramSchema,
+  properties: {
+    ...diagramSchema.properties,
+    nodes: {
+      ...diagramSchema.properties.nodes,
+      maxItems: 12,
+      items: {
+        ...diagramSchema.properties.nodes.items,
+        properties: {
+          ...diagramSchema.properties.nodes.items.properties,
+          id: { type: "string", pattern: "^n([1-9]|1[0-2])$" },
+        },
+      },
+    },
+    edges: { ...diagramSchema.properties.edges, minItems: 1, maxItems: 24 },
+  },
+};
+export const parseDiagramExtension = (value: unknown): DiagramExtension => {
+  const input = object(value, [
+    "version",
+    "title",
+    "direction",
+    "nodes",
+    "edges",
+  ]);
+  if (
+    !Array.isArray(input.nodes) ||
+    !input.nodes.length ||
+    input.nodes.length > 12 ||
+    !Array.isArray(input.edges) ||
+    !input.edges.length ||
+    input.edges.length > 24
+  ) {
+    throw new Error("Invalid extension size");
+  }
+  const parsed = parseDiagram({
+    ...input,
+    nodes: [{ id: "s1", label: "Anchor", kind: "process" }, ...input.nodes],
+  });
+  const nodes = parsed.nodes.slice(1);
+  if (nodes.some((node) => !/^n([1-9]|1[0-2])$/.test(node.id))) {
+    throw new Error("Invalid extension alias");
+  }
+  const pairs = new Set<string>();
+  const connected = new Set(["s1"]);
+  for (const edge of parsed.edges) {
+    const pair = `${edge.from}:${edge.to}`;
+    if (edge.from === edge.to || pairs.has(pair)) {
+      throw new Error("Invalid extension edge");
+    }
+    pairs.add(pair);
+  }
+  for (let i = 0; i <= nodes.length; i++) {
+    for (const edge of parsed.edges) {
+      if (connected.has(edge.from) || connected.has(edge.to)) {
+        connected.add(edge.from);
+        connected.add(edge.to);
+      }
+    }
+  }
+  if (nodes.some((node) => !connected.has(node.id))) {
+    throw new Error("Disconnected extension");
+  }
+  return { ...parsed, nodes };
+};
