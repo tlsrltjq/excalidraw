@@ -8,6 +8,7 @@ export type TicketRequest = {
   challenge: string;
 };
 export type TicketBackend = {
+  consumeQuota(): Promise<boolean>;
   authorize(input: TicketRequest): Promise<"read" | "write" | null>;
   sign(
     context: { roomId: string; origin: string; challenge: string },
@@ -129,6 +130,10 @@ export const createTicketHandler = (
       return new Response(null, { status: 429, headers });
     }
     try {
+      if (!(await backend.consumeQuota())) {
+        headers.set("retry-after", "60");
+        throw new RequestError(429);
+      }
       const input = await readInput(request);
       const scope = await backend.authorize(input);
       if (scope !== "read" && scope !== "write") {

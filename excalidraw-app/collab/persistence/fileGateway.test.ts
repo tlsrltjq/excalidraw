@@ -13,6 +13,8 @@ const input = {
 };
 const setup = () => {
   const backend = {
+    consumeQuota: vi.fn().mockResolvedValue(true),
+    reserve: vi.fn().mockResolvedValue(true),
     authorize: vi.fn().mockResolvedValue("write"),
     upload: vi.fn().mockResolvedValue(undefined),
     download: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),

@@ -16,6 +16,8 @@ export type FileRequest = {
   data?: string;
 };
 export type FileBackend = {
+  consumeQuota(): Promise<boolean>;
+  reserve(input: FileRequest): Promise<boolean>;
   authorize(input: FileRequest): Promise<"read" | "write" | null>;
   upload(path: string, bytes: Uint8Array<ArrayBuffer>): Promise<void>;
   download(path: string): Promise<Uint8Array<ArrayBuffer> | null>;
@@ -139,6 +141,10 @@ export const createFileHandler = (
       return new Response(null, { status: 429, headers });
     }
     try {
+      if (!(await backend.consumeQuota())) {
+        headers.set("retry-after", "60");
+        throw new RequestError(429);
+      }
       const input = validate(await readBody(request));
       const scope = await backend.authorize(input);
       if (
@@ -175,6 +181,9 @@ export const createFileHandler = (
         btoa(binary) !== encoded
       ) {
         throw new RequestError(400);
+      }
+      if (!(await backend.reserve(input))) {
+        throw new RequestError(507);
       }
       await backend.upload(
         path,

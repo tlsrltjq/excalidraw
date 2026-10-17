@@ -58,6 +58,8 @@ const request = (body: unknown) =>
 it("rejects file concurrency before authorization and releases on failure", async () => {
   const resolvers: ((value: null) => void)[] = [];
   const backend = {
+    consumeQuota: vi.fn().mockResolvedValue(true),
+    reserve: vi.fn().mockResolvedValue(true),
     authorize: vi.fn(
       () => new Promise<null>((resolve) => resolvers.push(resolve)),
     ),
@@ -85,6 +87,8 @@ it.each(["file", "ticket"])(
   "counts malformed %s attempts without calling backend",
   async (kind) => {
     const backend = {
+      consumeQuota: vi.fn().mockResolvedValue(true),
+      reserve: vi.fn().mockResolvedValue(true),
       authorize: vi.fn(),
       upload: vi.fn(),
       download: vi.fn(),
@@ -107,6 +111,7 @@ it.each(["file", "ticket"])(
 
 it("does not count CORS preflight against ticket renewal budget", async () => {
   const backend = {
+    consumeQuota: vi.fn().mockResolvedValue(true),
     authorize: vi.fn().mockResolvedValue("write"),
     sign: vi.fn().mockResolvedValue("TEST-ticket"),
   };
@@ -131,6 +136,7 @@ it("does not count CORS preflight against ticket renewal budget", async () => {
 it("bounds concurrent ticket signing and frees slots when signing fails", async () => {
   const resolvers: (() => void)[] = [];
   const backend = {
+    consumeQuota: vi.fn().mockResolvedValue(true),
     authorize: vi.fn().mockResolvedValue("write"),
     sign: vi.fn(
       () =>

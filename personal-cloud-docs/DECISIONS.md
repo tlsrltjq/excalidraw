@@ -1,5 +1,13 @@
 # 설계 결정 기록
 
+## D-031: DB 공유 quota와 보수적 파일 예약
+
+- 범위(2026-10-17): 새 협업 데이터만 scene 암호문 32 MiB, 파일 4 MiB 고정 슬롯 64개(256 MiB), room 256개/invite 4096개로 제한한다. 기존 개인 Cloud/Firebase는 포함하지 않으며 DB 물리 크기/월 대역폭/비용 상한 보장이 아니다. usage singleton의 원자적 조건부 UPDATE/row lock으로 동시 요청을 직렬화한다. 근거: https://www.postgresql.org/docs/16/transaction-iso.html 의 Read Committed UPDATE 조건 재평가.
+- 파일은 서비스 전용 RPC에서 write 초대 검증 후 path별 슬롯을 예약한다. 실패·응답 유실·덮어쓰기·room 삭제에도 예약을 줄이지 않는다. Storage trigger가 collab-files의 미예약 경로 insert/update를 거부한다. 실제 bytes 대신 bucket의 4 MiB 최대 크기를 예약해 병렬 덮어쓰기와 구 Edge의 크기 차이를 보수적으로 커버한다. 명시적 대조/보존 정책 없이 자동 해제/삭제하지 않는다. 파일 bucket이 이미 비어 있지 않으면 migration을 중단하고 별도 backfill부터 설계한다.
+- DB 공유 fixed-minute 예산: files 120, tickets 240, checks 600, reads 120, writes 120. files/tickets는 Edge가 service credential로 소비한 뒤 권한/Storage/서명을 요청한다. checks/reads는 기존 RPC, writes는 scene trigger에서 강제한다. 거부 시 일반화 오류/429이며 무제한 재시도하지 않는다. DB에서 rollback된 오류/잘못된 proof는 해당 트랜잭션 카운터도 rollback되므로 유효 요청/커밋의 상한이지 모든 악성 DB 시도 방어는 아니다.
+- 모든 quota/ledger table은 RLS on·클라이언트 GRANT/policy 없음. 공개 RPC는 기존 권한 유지; 예산 소비/예약은 service_role만 EXECUTE. service credential은 Edge env에만 둔다. 새 table은 proof/key/원문을 보관하지 않는다. 내부 helper도 PUBLIC/anon/authenticated/service_role EXECUTE 회수한다.
+- 완료 조건: 일회용 PostgreSQL에서 역할 격리·한도/회복·같은 경로 재시도·quota rollback·CAS·서로 다른 실제 DB 연결의 마지막 슬롯 경쟁, mock HTTP로 DB 예산 거부/실패 시 downstream 미호출/재시도 헤더, Deno/type/lint/앱/build/guardrail. 운영 미적용/flag off. 배포 시 파일 쓰기를 멈춘 뒤 migration→두 Edge 교체→Storage 실서비스 검사 순서이며 old Edge는 전역 요청 예산을 소비하지 않으므로 혼합 운영을 허용하지 않는다. relay 연결/송신 상한·인프라 로그·월 대역폭·hosted 두 계정 검증은 후속이다.
+
 ## D-030: 파일 압축 해제와 Edge 처리 자원 상한
 
 - 이번 단위: 새 Supabase 파일 복원의 압축 해제 중단 한도(4 MiB 데이터 + 64 KiB 메타데이터/래퍼), Edge 파일 120회/분·동시 3개, ticket 240회/분·동시 8개를 각 handler/isolate에 적용한다. 초과 요청은 body/권한/Storage/서명 처리 전에 429로 거부하고 Retry-After를 보낸다. Origin 제한/초대 권한 검사는 그대로 유지한다.

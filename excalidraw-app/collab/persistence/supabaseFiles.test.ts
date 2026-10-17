@@ -49,6 +49,8 @@ const fixture = async () =>
 const setup = (isCurrent = () => true) => {
   const stored = new Map<string, Uint8Array<ArrayBuffer>>();
   const backend = {
+    consumeQuota: vi.fn().mockResolvedValue(true),
+    reserve: vi.fn().mockResolvedValue(true),
     authorize: vi.fn().mockResolvedValue("write"),
     upload: vi.fn(async (path: string, bytes: Uint8Array<ArrayBuffer>) => {
       stored.set(path, bytes);

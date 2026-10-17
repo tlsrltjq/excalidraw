@@ -14,6 +14,38 @@
 
 ## 노트북에서 다시 시작
 
+### DB 공유 quota (개발 완료·운영 미적용, 2026-10-17)
+
+새 migration: `supabase/migrations/20261017090000_collab_project_quotas.sql`. 기존 개인 그림/Firebase가 아닌 **새 Supabase 협업 데이터**에만 적용한다.
+
+| 대상 | 한도 | 초기화/해제 |
+| --- | --- | --- |
+| scene 암호문 합계 | 32 MiB | 갱신 크기 차이/실제 scene 삭제를 같은 transaction으로 집계. 월초 초기화 아님 |
+| 파일 예약 | 64개 × 4 MiB = 256 MiB | 작은 파일도 슬롯 1개. 같은 경로 재시도/덮어쓰기는 추가 차감 없음. 자동 초기화/환급 없음 |
+| room / invite | 256개 / 4096개 | 비활성/만료/폐기도 행이 남으면 포함. 실제 삭제 시 감소하나 파일 예약은 남음 |
+| files / tickets | 각각 120 / 240 POST/분 | DB의 고정 분 경계에서 재개. Edge 인스턴스별 한도도 함께 유지 |
+| checks / reads / writes | 각각 600 / 120 / 120회/분 | 유효 RPC/커밋 기준. rollback된 DB 오류·잘못된 proof 시도는 카운터도 rollback |
+
+파일 예약은 write 초대 검증 뒤 서비스 전용 RPC가 수행하고, Storage trigger가 미예약 collab-files 경로를 거부한다. 응답이 유실됐거나 업로드 실패처럼 보여도 파일이 저장됐을 수 있으므로 예약을 자동 반환하지 않는다. 일반 사용자는 quota/ledger table을 읽거나 바꿀 수 없다. 서버용 credential은 브라우저가 아닌 Edge env에서만 사용하며 ticket 함수도 이제 이 credential이 없으면 503으로 닫힌다.
+
+- **429:** 60초 이상 기다린 뒤 실패한 요청만 다시 시도한다. DB read/check/write 초과는 일반화된 RPC 오류로 나타날 수 있다. 자동 고속 재시도/여러 계정·다른 서버로 우회하지 않는다.
+- **507:** 파일 예약 64개가 찼다. 기존 예약 경로 재시도는 가능하지만 새 파일은 불가하다. 기다리거나 파일을 작게 만들어도 슬롯은 환급되지 않는다. 파일을 삭제해보는 방식으로 복구하지 않는다.
+- **scene/room/invite 한도:** 실패한 transaction은 기존 데이터와 usage를 보존한다. 현재 UI는 상세 사용량 화면이 없고 일부 오류는 일반 저장 실패로 표시한다. 자동 덮어쓰기나 빈 그림 저장으로 해결하지 않는다.
+- **예약 정리:** 관리자가 Storage 실제 객체·진행 중 업로드·scene/version 참조를 대조하고 보존 유예/복구본을 확보한 후 별도 정리 절차를 설계해야 한다. 현재 자동 정리/클라이언트 해제 API는 없다. 단순히 counter를 0으로 만드는 SQL은 사용하지 않는다.
+
+배포할 때는 먼저 협업 파일 쓰기를 중단한다. bucket이 private이고 최대 4 MiB인지 확인 → bucket에 기존 파일이 없을 때 migration 적용 → files/ticket 두 Edge를 함께 교체 → 실제 Storage 업로드/덮어쓰기/거부/복원 검사 → relay/기타 배포·두 계정/게스트 검증 → 마지막에 앱 flag 활성화 여부를 결정한다. 기존 파일이 있으면 migration이 중단되며 데이터는 보존된다. 기존 파일을 삭제해 통과시키지 말고 backfill을 먼저 설계한다. old Edge는 공유 요청 예산을 소비하지 않으므로 구/신 버전 혼합 운영을 피한다. migration만 적용하고 old Edge로 돌아가면 새 파일은 미예약으로 거부될 수 있다. schema를 임의로 내리지 말고 쓰기를 중단한 채 호환 Edge로 복구한다.
+
+관리자 SQL Editor에서 아래 **읽기 전용** 조회로 집계를 확인할 수 있다. 공개 클라이언트나 로그에 원문 결과를 보내지 않는다.
+
+```sql
+select scene_bytes, file_slots, rooms, invites from public.collab_usage;
+select kind, window_start, used, max_requests from public.collab_request_budgets;
+```
+
+로컬 검증은 `node personal-cloud-harness/check-collab-scene.node-test.mjs`. Docker를 먼저 실행한다. 하네스는 network-none 임시 PostgreSQL만 생성/삭제하며 운영 DB를 사용하지 않는다. Storage는 로컬 메타데이터 stub으로 실제 hosted object backend 동작은 별도 검사다.
+
+이 한도는 DB 물리 파일/인덱스/WAL/Storage의 이전 object version·월 대역폭·모든 악성 호출/요금까지 제한하지 않는다. 파일 예약은 실패로 소진될 수 있고, 전역 예산은 한 사용자가 소진하면 다른 참가자도 잠시 제한된다. relay 연결/송신 상한, 플랫폼 ingress/body/SQL parameter 로그 정책과 hosted 검증은 아직 남아 있다. 유료 전환이나 운영 설정 변경은 하지 않았다.
+
 ### 협업 자원 제한과 초과 대응 (미배포, 2026-10-14)
 
 | 범위 | 새 코드의 제한 | 한계 |

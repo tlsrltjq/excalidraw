@@ -1,3 +1,5 @@
+import { createProjectQuota } from "../_shared/projectQuota.ts";
+
 import { createFileHandler, MAX_FILE_BYTES } from "./handler.ts";
 
 // Deployment secrets stay in the Edge runtime, never in the app bundle.
@@ -12,6 +14,7 @@ const origins = (Deno.env.get("COLLAB_ALLOWED_ORIGINS") ?? "")
 if (!url || !publicKey || !adminKey || !origins.length) {
   Deno.serve(() => new Response(null, { status: 503 }));
 } else {
+  const quota = createProjectQuota(url, adminKey);
   const adminHeaders = {
     apikey: adminKey,
     authorization: `Bearer ${adminKey}`,
@@ -20,6 +23,8 @@ if (!url || !publicKey || !adminKey || !origins.length) {
   Deno.serve(
     createFileHandler(
       {
+        consumeQuota: () => quota.consume("files"),
+        reserve: (input) => quota.reserve(input),
         async authorize(input) {
           const result = await fetch(`${url}/rest/v1/rpc/collab_check_invite`, {
             method: "POST",

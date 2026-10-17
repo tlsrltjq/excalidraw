@@ -137,6 +137,34 @@ try {
     "0\n0\n0",
   );
   process.stdout.write("PASS: rollback preserves an empty fixture DB\n");
+  await sql(
+    readFileSync(
+      `${root}supabase/migrations/20261017090000_collab_project_quotas.sql`,
+      "utf8",
+    ),
+  );
+  await sql(
+    readFileSync(
+      `${root}personal-cloud-harness/check-collab-quotas.sql`,
+      "utf8",
+    ),
+  );
+  process.stdout.write(
+    "PASS: quota role, storage, scene, rollback and rate assertions\n",
+  );
+  const quotaAccess = await sql(
+    readFileSync(
+      `${root}personal-cloud-harness/check-collab-scene-access.sql`,
+      "utf8",
+    ),
+  );
+  assert.equal(
+    quotaAccess.split("\n").filter((line) => line.startsWith("PASS:")).length,
+    28,
+  );
+  process.stdout.write(
+    "PASS: existing 28 access/CAS assertions after quota migration\n",
+  );
   await sql(`
     insert into auth.users(id) values ('00000000-0000-4000-8000-000000000011');
     set request.jwt.claim.sub = '00000000-0000-4000-8000-000000000011';
@@ -154,6 +182,82 @@ try {
   );
   process.stdout.write(
     "PASS: two real PostgreSQL clients create only one CAS revision\n",
+  );
+  const reserve = (id) =>
+    `set role service_role; select public.collab_reserve_file('sc_aaaaaaaaaaaaaaaaaaaa','00000000-0000-4000-8000-000000000001',repeat('0',64),'${id}');`;
+  for (let i = 0; i < 63; i++) {
+    assert.equal((await sql(reserve(`TEST-${i}`))).trim(), "t");
+  }
+  const slots = await Promise.all([
+    sql(reserve("TEST-last-a")),
+    sql(reserve("TEST-last-b")),
+  ]);
+  assert.deepEqual(slots.map((v) => v.trim()).sort(), ["f", "t"]);
+  assert.equal(
+    (
+      await sql(
+        "select file_slots from public.collab_usage; select count(*) from public.collab_file_reservations;",
+      )
+    ).trim(),
+    "64\n64",
+  );
+  process.stdout.write(
+    "PASS: two DB clients cannot overbook the last file slot\n",
+  );
+  await sql(
+    "update public.collab_request_budgets set window_start=date_trunc('minute',clock_timestamp()) + interval '1 minute', used=max_requests-1 where kind='tickets';",
+  );
+  const requests = await Promise.all([
+    sql(
+      "set role service_role; select public.collab_consume_edge_budget('tickets');",
+    ),
+    sql(
+      "set role service_role; select public.collab_consume_edge_budget('tickets');",
+    ),
+  ]);
+  assert.deepEqual(requests.map((v) => v.trim()).sort(), ["f", "t"]);
+  process.stdout.write("PASS: two DB clients share the last request token\n");
+  await sql("create database collab_backfill;");
+  const backfill = [
+    "\\connect collab_backfill",
+    readFileSync(
+      `${root}personal-cloud-harness/collab-local-bootstrap.sql`,
+      "utf8",
+    ).replace(/create role .*;\n/g, ""),
+    readFileSync(
+      `${root}supabase/migrations/20261013150000_create_collab_scene_rpc.sql`,
+      "utf8",
+    ),
+    readFileSync(
+      `${root}personal-cloud-harness/collab-files-local-bootstrap.sql`,
+      "utf8",
+    ),
+    readFileSync(
+      `${root}supabase/migrations/20261014110000_create_collab_files_bucket.sql`,
+      "utf8",
+    ),
+    "insert into storage.objects(bucket_id,name) values('collab-files','TEST-existing');",
+  ].join("\n");
+  await sql(backfill);
+  await assert.rejects(
+    sql(
+      `\\connect collab_backfill\n${readFileSync(
+        `${root}supabase/migrations/20261017090000_collab_project_quotas.sql`,
+        "utf8",
+      )}`,
+    ),
+    /require quota backfill/,
+  );
+  assert.equal(
+    (
+      await sql(
+        "\\connect collab_backfill\nselect to_regclass('public.collab_usage') is null; select count(*) from storage.objects;",
+      )
+    ).trim(),
+    "t\n1",
+  );
+  process.stdout.write(
+    "PASS: nonempty bucket blocks migration without data loss\n",
   );
 } finally {
   docker(["rm", "-f", container]);

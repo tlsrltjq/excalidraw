@@ -1,5 +1,14 @@
 # MVP 검증 기록
 
+## 2026-10-17 DB 공유 quota
+
+- 변경: quota/ledger/RLS·서비스 전용 RPC·Storage/scene/metadata trigger migration, shared projectQuota RPC helper, files/ticket handler와 entrypoint, 4개 기존 fixture 및 신규 mock HTTP test, 일회용 DB bootstrap/하네스/SQL 검사, 계획·운영 문서. core/dependency/일반 개인 Cloud/relay/운영 설정·요금은 변경하지 않았다. 운영 flag off 유지.
+- 신규 mock HTTP 11개 통과: DB 예산 거부 429/Retry-After/body 미사용·권한/Storage/sign 미호출, transport/잘못된 응답 fail-closed·진단 비노출, 예약 거부 507, 업로드 응답 유실 후 같은 경로 재시도, read/잘못된 bytes는 예약하지 않음, RPC 인자 allowlist/redirect 금지. 기존 persistence 203개도 통과했다.
+- 일회용 실제 PostgreSQL: 기존 private Storage 정책 11개(로컬 stub), 기존 role/access/CAS 28개를 migration 전/후 각각 통과. 신규 quota SQL 33항목은 RLS/직접 GRANT·서비스 전용 함수 격리, wrong proof/read 거부, 동일 경로 재시도·quota 가득 참·Storage 미예약 insert/rename, scene bytes delta/한도 초과 시 원본 보존, room/invite 상한, 분 예산 거부/회복 및 cascade 후 파일 예약 보존을 확인했다. SQL 실패는 예상 SQLSTATE까지 비교한다.
+- 별도 실제 DB 연결 2개가 마지막 파일 슬롯(실제 63개 예약 후 경쟁)·마지막 요청 token을 두고 경쟁하면 한 개만 성공했다. 기존 CAS도 한 revision만 저장. 기존 파일이 있는 별도 DB에서 migration이 실패하고 quota table 미생성/원래 객체 유지도 확인했다. 임시 container/DB는 finally에서 정리했다. Docker가 꺼져 있어 최초 실행은 실패했고 `docker desktop start`로 시작한 뒤 재실행 통과했다. 운영 DB 접속은 없다.
+- 전체 앱 suite: 151파일/2,166 passed/47 skipped/1 todo. 전체 lint/앱 typecheck, Docker network-none Deno 두 entrypoint 검사, build/PWA precache 통과. guardrails에서 새 private table에 client policy가 없다는 경고는 의도된 default-deny 구조이며 RLS/GRANT 역할 검사로 확인했다. 기존 Node/MetaProperty/font/chunk/Browserslist 경고 유지. 코드 format/diff도 확인한다.
+- 미검증/위험: UI/scene 포맷 무변경으로 Safari/운영 로그인·두 계정·게스트·모바일 검사는 생략. hosted Storage 실제 POST/overwrite/metadata 생성 순서·trigger 호환성, provider log/body 정책과 배포·old/new Edge 전환은 미확인이다. 예약은 보수적으로 남으며 자동 환급하지 않는다. DB rollback된 거부 시도는 rate counter도 rollback된다. 협업 payload·예약 상한이지 DB 물리 크기·월 대역폭·요금/모든 공격 차단 보장은 아니다. 다음은 relay 연결/송신 총량과 로그 정책, 이후 hosted 순차 적용/검증이다.
+
 ## 2026-10-14 자원 제한 첫 단위
 
 - 변경: Supabase file loader/test의 압축 해제 상한, core `data/encode.ts`의 optional maxDecompressedBytes API(D-030 명시 예외), Edge shared requestBudget와 files/ticket handler, resourceLimits test, README/ROADMAP/DECISIONS/operations/검증 문서. core의 다른 파일/암호화 형식/dependency/schema/relay/운영 env/요금은 변경하지 않았다. 기존 기본 codec/Firebase 및 flag off 유지.

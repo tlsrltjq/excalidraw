@@ -1,8 +1,11 @@
+import { createProjectQuota } from "../_shared/projectQuota.ts";
+
 import { createTicketHandler } from "./handler.ts";
 import { signRelayTicket } from "./ticket.ts";
 
 const url = Deno.env.get("SUPABASE_URL")?.replace(/\/$/, "");
 const publicKey = Deno.env.get("SUPABASE_ANON_KEY");
+const adminKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const privateJwk = Deno.env.get("COLLAB_TICKET_PRIVATE_JWK");
 const origins = (Deno.env.get("COLLAB_ALLOWED_ORIGINS") ?? "")
   .split(",")
@@ -28,13 +31,15 @@ try {
   // Missing/invalid configuration fails closed without printing secret material.
 }
 
-if (!url || !publicKey || !signingKey || !origins.length) {
+if (!url || !publicKey || !adminKey || !signingKey || !origins.length) {
   Deno.serve(() => new Response(null, { status: 503 }));
 } else {
+  const quota = createProjectQuota(url, adminKey);
   const key = signingKey;
   Deno.serve(
     createTicketHandler(
       {
+        consumeQuota: () => quota.consume("tickets"),
         async authorize(input) {
           const result = await fetch(`${url}/rest/v1/rpc/collab_check_invite`, {
             method: "POST",

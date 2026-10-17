@@ -113,6 +113,7 @@ it("rejects signatures from another key", async () => {
 });
 const setup = () => {
   const backend = {
+    consumeQuota: vi.fn().mockResolvedValue(true),
     authorize: vi.fn().mockResolvedValue("read"),
     sign: vi.fn((ctx, scope) =>
       signRelayTicket(keys.privateKey, ctx, scope, now),

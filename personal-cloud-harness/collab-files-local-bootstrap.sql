@@ -9,8 +9,8 @@ create table storage.objects (
   bucket_id text not null references storage.buckets(id), name text not null
 );
 alter table storage.objects enable row level security;
-grant usage on schema storage to anon, authenticated;
-grant select, insert, update, delete on storage.objects to anon, authenticated;
+grant usage on schema storage to anon, authenticated, service_role;
+grant select, insert, update, delete on storage.objects to anon, authenticated, service_role;
 -- Deliberately broad policy tests whether the restrictive migration still blocks access.
 create policy local_test_broad_policy on storage.objects for all to anon, authenticated
   using (true) with check (true);
