@@ -1,5 +1,12 @@
 # 설계 결정 기록
 
+## D-034: 선택한 텍스트의 로컬 AI 수정
+
+- 범위(2026-10-17): 생성 MVP에 선택 텍스트 수정 모드를 추가한다. 선택한 text 및 선택한 도형/화살표에 연결된 text만 대상이다. 원본 element ID 대신 요청 내 t1..t24 alias와 문구만 로컬 모델에 보낸다. 이미지/선택 밖 문구/계정/전체 scene은 전송하지 않는다. 생성 요청의 기존 계약은 유지한다.
+- 모델은 version 1과 changes(id,text)만 반환한다. 최대 24개, 입력 alias 참조/중복/길이/unknown field를 서버와 클라이언트에서 검사한다. 요청 context는 최대 24개/문구당 500자/전체 body 24 KiB, 새 문구는 120자 한 줄로 제한한다. 기존 Origin/Host/token/고정 Ollama endpoint와 생성·수정 합산 single-flight/분당 6회/취소를 재사용한다. 모델 입력의 문구는 지시문이 아닌 자료로 취급한다.
+- 적용 전 변경 전후 목록을 보여주고, 기존 문서/계정/generation/route/view/collab/scene 및 선택 대상이 같을 때만 문서별 snapshot 후 적용한다. text 원본·표시 문구/치수는 기존 text 측정/줄바꿈/배치 helper로 계산하고 newElementWith/updateScene을 사용한다. 도형/arrow geometry와 ID/binding/index는 보존한다. 공간 부족 시 글꼴을 줄이되 12px(원본이 더 작으면 원본 크기) 미만은 거부한다. 구조 변경/도형 삭제/추가/이동/자동 문서 전체 수정은 후속이다.
+- 완료 조건: alias/권한 allowlist와 주입·잘못된 출력 거부, 선택 밖 보존, bound/free/arrow text 배치·글꼴 fit·원본 불변성·backup 실패·stale selection/scene·한 번 undo/redo, UI 전후 목록과 취소, 기존 생성 HTTP/앱 회귀, 타입/린트/build/guardrails 및 Safari 합성 로컬 모델 수정 확인. 모델의 의미/번역 정확성은 보장하지 않으며 미리보기 판단이 필요하다. 무료/로컬 전용, core/DB/dependency/운영 설정은 그대로다.
+
 ## D-033: 무료 로컬 AI 생성·미리보기·추가 MVP
 
 - 사용자 우선순위 변경(2026-10-17): Milestone 8 운영 점검/배포는 보류하고 Milestone 9 AI 기능을 먼저 구현한다. 무료 조건 때문에 Milestone 10의 loopback Ollama adapter를 앞당긴다. 설치된 생성 모델만 사용하며 다운로드·Cloud API·키 발급·운영 배포는 하지 않는다.

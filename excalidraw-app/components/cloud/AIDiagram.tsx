@@ -18,12 +18,22 @@ import {
   loadAIBackup,
   saveAIBackup,
 } from "../../ai/editor";
-import { connectLocalAI, generateLocalDiagram } from "../../ai/client";
+import {
+  connectLocalAI,
+  generateLocalDiagram,
+  editLocalLabels,
+} from "../../ai/client";
+import {
+  applyLabelPreview,
+  createLabelPreview,
+  selectedLabelTargets,
+} from "../../ai/labelEditor";
 
 import "./AIDiagram.scss";
 
 import type { CanvasSnapshot } from "../../ai/editor";
 import type { AISession } from "../../ai/client";
+import type { LabelPreview } from "../../ai/labelEditor";
 
 export const aiDiagramOpenAtom = atom(false);
 const identity = () =>
@@ -43,7 +53,10 @@ const allowed = (api: ExcalidrawImperativeAPI) =>
   !api.getAppState().viewModeEnabled &&
   !window.location.hash.startsWith("#room=") &&
   !new URLSearchParams(window.location.search).has("collabStorage");
-type Preview = Awaited<ReturnType<typeof createDiagramPreview>> & {
+type Preview = (
+  | (Awaited<ReturnType<typeof createDiagramPreview>> & { kind: "create" })
+  | (LabelPreview & { kind: "labels" })
+) & {
   baseline: CanvasSnapshot;
   identity: string;
   title: string;
@@ -77,6 +90,14 @@ const AIDiagramBody = ({ api }: { api: ExcalidrawImperativeAPI }) => {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [previewURL, setPreviewURL] = useState("");
   const [backupExists, setBackupExists] = useState(false);
+  const [mode, setMode] = useState<"create" | "labels">("create");
+  const [selection] = useState(() => {
+    try {
+      return selectedLabelTargets(api);
+    } catch {
+      return [];
+    }
+  });
   const controller = useRef<AbortController | null>(null);
   const generation = useRef(0);
   const working = useRef(false);
@@ -169,7 +190,7 @@ const AIDiagramBody = ({ api }: { api: ExcalidrawImperativeAPI }) => {
   }, []);
 
   useEffect(() => {
-    if (!preview) {
+    if (!preview || preview.kind !== "create") {
       setPreviewURL("");
       return;
     }
@@ -191,23 +212,47 @@ const AIDiagramBody = ({ api }: { api: ExcalidrawImperativeAPI }) => {
     setPreview(null);
     try {
       const baseline = captureCanvas(api);
-      const plan = await generateLocalDiagram(
-        session,
-        model,
-        prompt,
-        request.signal,
-      );
-      if (!current() || operation !== generation.current) {
-        return;
-      }
-      const output = await createDiagramPreview(plan);
-      if (current() && operation === generation.current) {
-        setPreview({
+      let result: Preview;
+      if (mode === "labels") {
+        const edit = await editLocalLabels(
+          session,
+          model,
+          prompt,
+          selection.map(({ id, text }) => ({ id, text })),
+          request.signal,
+        );
+        if (!current() || operation !== generation.current) {
+          return;
+        }
+        const output = await createLabelPreview(api, edit, selection);
+        result = {
           ...output,
+          kind: "labels",
+          baseline,
+          identity: identity(),
+          title: "문구 수정",
+        };
+      } else {
+        const plan = await generateLocalDiagram(
+          session,
+          model,
+          prompt,
+          request.signal,
+        );
+        if (!current() || operation !== generation.current) {
+          return;
+        }
+        const output = await createDiagramPreview(plan);
+        result = {
+          ...output,
+          kind: "create",
           baseline,
           identity: identity(),
           title: plan.title,
-        });
+        };
+      }
+      if (current() && operation === generation.current) {
+        setPreview(result);
       }
     } catch (e) {
       if (
@@ -237,21 +282,33 @@ const AIDiagramBody = ({ api }: { api: ExcalidrawImperativeAPI }) => {
     setError("");
     const operation = generation.current;
     try {
-      await appendAIDiagram(
-        api,
-        preview.elements,
-        preview.baseline,
-        () =>
-          current() &&
-          preview.identity === identity() &&
-          operation === generation.current,
-        async () => {
-          await saveAIBackup(backupKey(), preview.baseline);
-          if (current()) {
-            setBackupExists(true);
-          }
-        },
-      );
+      const stillCurrent = () =>
+        current() &&
+        preview.identity === identity() &&
+        operation === generation.current;
+      const backup = async () => {
+        await saveAIBackup(backupKey(), preview.baseline);
+        if (current()) {
+          setBackupExists(true);
+        }
+      };
+      if (preview.kind === "labels") {
+        await applyLabelPreview(
+          api,
+          preview,
+          preview.baseline,
+          stillCurrent,
+          backup,
+        );
+      } else {
+        await appendAIDiagram(
+          api,
+          preview.elements,
+          preview.baseline,
+          stillCurrent,
+          backup,
+        );
+      }
       setOpen(false);
     } catch {
       if (mounted.current && operation === generation.current) {
@@ -288,6 +345,33 @@ const AIDiagramBody = ({ api }: { api: ExcalidrawImperativeAPI }) => {
 
   return (
     <div className="personal-ai-diagram">
+      <div
+        className="personal-ai-diagram__modes"
+        role="tablist"
+        aria-label="AI 작업"
+      >
+        {(
+          [
+            ["create", "새 다이어그램"],
+            ["labels", "선택 문구 수정"],
+          ] as const
+        ).map(([value, title]) => (
+          <button
+            type="button"
+            role="tab"
+            key={value}
+            aria-selected={mode === value}
+            disabled={busy || connecting}
+            onClick={() => {
+              setMode(value);
+              setPreview(null);
+              setError("");
+            }}
+          >
+            {title}
+          </button>
+        ))}
+      </div>
       <div className="personal-ai-diagram__connection">
         <label>
           로컬 모델
@@ -312,13 +396,31 @@ const AIDiagramBody = ({ api }: { api: ExcalidrawImperativeAPI }) => {
           {session ? "다시 연결" : "연결"}
         </button>
       </div>
+      {mode === "labels" && (
+        <div className="personal-ai-diagram__targets">
+          <strong>선택 문구 ({selection.length})</strong>
+          {selection.length ? (
+            <ul>
+              {selection.map((target) => (
+                <li key={target.id}>{target.text}</li>
+              ))}
+            </ul>
+          ) : (
+            <p role="status">수정 가능한 선택 문구가 없습니다.</p>
+          )}
+        </div>
+      )}
       <label className="personal-ai-diagram__prompt">
         요청
         <textarea
           rows={4}
           maxLength={2000}
           value={prompt}
-          placeholder="로그인 → 인증 확인 → 성공 또는 오류 처리 흐름"
+          placeholder={
+            mode === "labels"
+              ? "선택한 문구를 짧은 한국어로 다듬어줘"
+              : "로그인 → 인증 확인 → 성공 또는 오류 처리 흐름"
+          }
           disabled={busy}
           onChange={(event) => {
             setPrompt(event.target.value);
@@ -333,7 +435,14 @@ const AIDiagramBody = ({ api }: { api: ExcalidrawImperativeAPI }) => {
       <div className="personal-ai-diagram__actions">
         <button
           type="button"
-          disabled={!session || !model || !prompt.trim() || busy || !current()}
+          disabled={
+            !session ||
+            !model ||
+            !prompt.trim() ||
+            busy ||
+            !current() ||
+            (mode === "labels" && !selection.length)
+          }
           onClick={generate}
         >
           {MagicIcon}
@@ -364,10 +473,31 @@ const AIDiagramBody = ({ api }: { api: ExcalidrawImperativeAPI }) => {
         )}
       </div>
       <div
-        className="personal-ai-diagram__preview"
+        className={
+          preview?.kind === "labels"
+            ? "personal-ai-diagram__changes"
+            : "personal-ai-diagram__preview"
+        }
         aria-label="다이어그램 미리보기"
       >
-        {previewURL ? (
+        {preview?.kind === "labels" ? (
+          <table>
+            <thead>
+              <tr>
+                <th>변경 전</th>
+                <th>변경 후</th>
+              </tr>
+            </thead>
+            <tbody>
+              {preview.changes.map((change) => (
+                <tr key={change.id}>
+                  <td>{change.before}</td>
+                  <td>{change.after}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : previewURL ? (
           <img src={previewURL} alt={preview?.title ?? "다이어그램"} />
         ) : (
           <span>{busy ? "생성 중…" : "미리보기"}</span>
@@ -380,7 +510,7 @@ const AIDiagramBody = ({ api }: { api: ExcalidrawImperativeAPI }) => {
           disabled={!preview || busy || !current()}
           onClick={apply}
         >
-          캔버스에 추가
+          {mode === "labels" ? "수정 적용" : "캔버스에 추가"}
         </button>
       </div>
     </div>

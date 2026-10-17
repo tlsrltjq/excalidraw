@@ -227,3 +227,114 @@ test("browser cancellation aborts provider work", async () => {
     },
   );
 });
+
+test("label edits send only provided aliases/text and validate returned references", async () => {
+  const targets = [{ id: "t1", text: "Synthetic original" }];
+  const edit = { version: 1, changes: [{ id: "t1", text: "Short" }] };
+  await fixture(
+    async ({ request, calls }) => {
+      const { token } = await (await request("/session")).json();
+      assert.equal(
+        (
+          await request(
+            "/edit-labels",
+            generation("wrong", {
+              model: "local:tiny",
+              prompt: "Shorten",
+              targets,
+            }),
+          )
+        ).status,
+        403,
+      );
+      const response = await request(
+        "/edit-labels",
+        generation(token, { model: "local:tiny", prompt: "Shorten", targets }),
+      );
+      assert.equal(response.status, 200);
+      assert.deepEqual((await response.json()).edit, edit);
+      const body = JSON.parse(
+        calls.find((call) => call.url.endsWith("/chat")).body,
+      );
+      assert.deepEqual(JSON.parse(body.messages[1].content), {
+        instruction: "Shorten",
+        targets,
+      });
+      assert.equal(body.tools, undefined);
+      assert.equal(
+        (
+          await request(
+            "/edit-labels",
+            generation(token, {
+              model: "local:tiny",
+              prompt: "Shorten",
+              targets: [{ id: "actual-element-id", text: "x" }],
+            }),
+          )
+        ).status,
+        422,
+      );
+    },
+    async () => ({ done: true, message: { content: JSON.stringify(edit) } }),
+  );
+  await fixture(
+    async ({ request }) => {
+      const { token } = await (await request("/session")).json();
+      assert.equal(
+        (
+          await request(
+            "/edit-labels",
+            generation(token, {
+              model: "local:tiny",
+              prompt: "Shorten",
+              targets,
+            }),
+          )
+        ).status,
+        422,
+      );
+    },
+    async () => ({
+      done: true,
+      message: {
+        content: JSON.stringify({
+          version: 1,
+          changes: [{ id: "t2", text: "Other" }],
+        }),
+      },
+    }),
+  );
+});
+
+test("label edits and generation share the same rate budget", async () => {
+  await fixture(
+    async ({ request }) => {
+      const { token } = await (await request("/session")).json();
+      for (let i = 0; i < 6; i++) {
+        assert.equal(
+          (
+            await request(
+              "/edit-labels",
+              generation(token, {
+                model: "local:tiny",
+                prompt: "Shorten",
+                targets: [{ id: "t1", text: "Original" }],
+              }),
+            )
+          ).status,
+          200,
+        );
+      }
+      assert.equal((await request("/generate", generation(token))).status, 429);
+    },
+    async () => ({
+      done: true,
+      message: {
+        content: JSON.stringify({
+          version: 1,
+          changes: [{ id: "t1", text: "New" }],
+        }),
+      },
+    }),
+  );
+});

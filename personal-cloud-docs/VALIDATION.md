@@ -1,5 +1,14 @@
 # MVP 검증 기록
 
+## 2026-10-17 선택 문구 로컬 AI 수정
+
+- 범위: `codex/ai-label-editing`, D-034. 신규 `ai/labelEditor.ts`와 실제 편집기 테스트, 기존 AI schema/client/dialog/style/UI·schema test, loopback `/edit-labels`와 HTTP test, README/ROADMAP/DECISIONS/ai-gateway/operations/본 기록을 변경했다. 기존 생성 API/보안 경계·무료 로컬 전용을 유지하고 core/dependency/DB/relay/운영 endpoint·요금은 변경하지 않았다.
+- 앱 범위 `yarn test:app --watch=false excalidraw-app --minWorkers=1 --maxWorkers=2`: 37파일/348개 통과(이전 331개 대비 신규 17개). alias/잘못된 참조·중복/unknown field/개수·텍스트 길이 거부, UI 대상 문구만 전송/전후 비교/명시적 적용·선택 없음 거부, 실제 편집기 bound/free/arrow 텍스트 수정·원본 불변성과 선택 밖 보존·도형 geometry/binding 유지, font fit/최소 크기 거부·stale scene/선택·read-only/backup 실패·한 번 undo/redo를 확인했다. 원래 API 변환이 ID를 재생성하는 fixture와 view mode가 선택을 해제하는 테스트 순서를 보완했고 최종 재실행은 통과했다.
+- 실제 loopback HTTP 하네스 8개 통과(기존 6개+수정 2개): 기존 Host/Origin/token/취소/single-flight/예산 유지, 수정 요청의 alias/문구만 upstream 전달, 실제 ID·없는 alias 거부, 생성과 수정의 합산 분당 6회 제한을 검사했다. provider는 합성 mock이며 모델 의미 정확성은 검사하지 않는다.
+- 최종 `yarn test:typecheck`, `yarn test:code`, `yarn build` 및 PWA precache 62개, guardrails/diff/scoped format 검사 통과. typecheck에서 arrow fixture의 branded LocalPoint를 기존 pointFrom helper로 수정했다. 기존 Node MODULE_TYPELESS/DEP0169, MetaProperty lint 진단·테스트 Firebase config/font/chunk/Browserslist 경고는 유지한다. 전체 upstream suite/운영 DB·두 계정·게스트/모바일·다른 기기·Cloud 저장/실제 장애 주입은 범위 밖으로 생략했다.
+- Safari 실제 확인: 기존 합성 로컬 아키텍처의 3개 문구를 선택하고 `qwen3.5:9b`로 괄호 속 영문 제거·축약을 요청했다. `클라이언트 (Browser)→브라우저`, `웹 서버 (Web Server)→서버`, `데이터베이스 (DB)→DB` 전후 표를 확인하고 적용했다. 도형/arrow와 선택 밖 로그인 흐름은 보존됐으며 한 번 undo로 원문 전체 복구 후 redo로 재적용했다. 스크린샷 `/tmp/personal-excalidraw-ai-label-preview.png`, `/tmp/personal-excalidraw-ai-label-applied.png`는 임시 로컬 증거이며 Git에는 넣지 않는다. 이번에는 backup 다운로드/재가져오기를 다시 실행하지 않았고 기존 생성 MVP 및 실제 IndexedDB 자동 검사 결과와 구분한다.
+- 한계: 첫 수정 범위는 문구뿐이다. 구조 재작성/새 도형/삭제·이동/대화 이력과 수정 이미지 미리보기는 미구현이다. 전후 표로 의미를 검토해야 하고 번역/축약 정확성을 보장하지 않는다. 공간에 맞추기 위해 font를 줄일 수 있고 최소 크기에서 들어가지 않으면 전체 적용을 거부한다. 직접 arrow 끝점이 붙은 standalone text, 잠긴/깨진 binding/비정상 치수 등은 지원하지 않는다. 백업은 생성 모드와 같은 계정/문서별 마지막 한 개를 공유하며 로컬 보존·eviction/로그아웃/원격 복구 한계는 D-033과 같다. 운영 배포는 하지 않았고 모델 11434/bridge 3004/개발 앱 3006은 체험을 위해 실행 상태로 둔다.
+
 ## 2026-10-17 무료 로컬 AI 다이어그램 MVP
 
 - 우선순위: 사용자 요청으로 Milestone 8 운영 점검/배포를 보류하고 Milestone 9/10 로컬 AI 생성부터 구현했다(D-033). 기능 브랜치 `codex/local-ai-diagrams`. 신규 app `ai/schema/client/editor`, `components/cloud/AIDiagram`과 메뉴/App 연결, loopback bridge/HTTP 검사, README/ROADMAP/DECISIONS/ai-gateway/operations/본 기록이 변경 범위다. core/dependency/DB/relay/운영 endpoint·요금은 바꾸지 않았다.

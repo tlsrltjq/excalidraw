@@ -165,3 +165,76 @@ export const diagramToMermaid = (value: Diagram) => {
     ),
   ].join("\n");
 };
+
+export type LabelTarget = { id: string; text: string };
+export type LabelEdit = { version: 1; changes: LabelTarget[] };
+export const labelEditSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["version", "changes"],
+  properties: {
+    version: { type: "integer", const: 1 },
+    changes: {
+      type: "array",
+      minItems: 1,
+      maxItems: 24,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "text"],
+        properties: {
+          id: { type: "string", pattern: "^t([1-9]|1[0-9]|2[0-4])$" },
+          text,
+        },
+      },
+    },
+  },
+};
+export const parseLabelTargets = (value: unknown): LabelTarget[] => {
+  if (!Array.isArray(value) || !value.length || value.length > 24) {
+    throw new Error("Invalid text selection");
+  }
+  const seen = new Set<string>();
+  return value.map((item) => {
+    const target = object(item, ["id", "text"]);
+    const id = identifier(target.id);
+    if (!/^t([1-9]|1[0-9]|2[0-4])$/.test(id) || seen.has(id)) {
+      throw new Error("Invalid text alias");
+    }
+    seen.add(id);
+    if (typeof target.text !== "string" || target.text.length > 500) {
+      throw new Error("Invalid text input");
+    }
+    // Original text can contain line breaks; generated labels remain one line.
+    label(target.text.replace(/\r?\n/g, " "), 500);
+    return { id, text: target.text };
+  });
+};
+export const parseLabelEdit = (
+  value: unknown,
+  targets: readonly LabelTarget[],
+): LabelEdit => {
+  const input = object(value, ["version", "changes"]);
+  if (
+    input.version !== 1 ||
+    !Array.isArray(input.changes) ||
+    !input.changes.length ||
+    input.changes.length > 24
+  ) {
+    throw new Error("Invalid text operation");
+  }
+  const allowed = new Set(
+    parseLabelTargets(targets).map((target) => target.id),
+  );
+  const seen = new Set<string>();
+  const changes = input.changes.map((value) => {
+    const change = object(value, ["id", "text"]);
+    const id = identifier(change.id);
+    if (!allowed.has(id) || seen.has(id)) {
+      throw new Error("Unknown or repeated text target");
+    }
+    seen.add(id);
+    return { id, text: label(change.text) };
+  });
+  return { version: 1, changes };
+};
