@@ -1,5 +1,13 @@
 # 설계 결정 기록
 
+## D-033: 무료 로컬 AI 생성·미리보기·추가 MVP
+
+- 사용자 우선순위 변경(2026-10-17): Milestone 8 운영 점검/배포는 보류하고 Milestone 9 AI 기능을 먼저 구현한다. 무료 조건 때문에 Milestone 10의 loopback Ollama adapter를 앞당긴다. 설치된 생성 모델만 사용하며 다운로드·Cloud API·키 발급·운영 배포는 하지 않는다.
+- 첫 범위는 자연어→version 1 Diagram DSL→기존 mermaid-to-excalidraw/layout + convert helper→PNG 미리보기→명시적 추가다. Safari SVG 한글 subset 표시 문제를 피하기 위해 미리보기만 기존 raster export를 사용하며 적용은 native element다. 현재 그림/이미지/계정 정보는 모델에 보내지 않고 입력한 prompt만 보낸다. 방향/제목, 최대 24개 노드·40개 연결, 3개 shape만 허용한다. unknown field·중복 ID·없는 참조·제어문자·과도한 텍스트/크기는 거부한다. raw Excalidraw JSON/HTML/링크/파일/삭제/임의 canvas operation은 허용하지 않는다. 기존 element는 변이하지 않는다.
+- Node bridge는 127.0.0.1:3004만 bind, Host/정확한 개발 loopback Origin/프로세스 메모리 token을 검증한다. session token은 허용 Origin에서만 읽고 메모리에만 보관하며 로그/URL/VITE/storage에 넣지 않는다. Ollama 목적지는 127.0.0.1:11434 고정, client URL·tools·pull API를 받지 않는다. 1 single-flight/6 generation 분당·입출력 크기/180초 취소·오류 비노출. Ollama 전역 Origin이나 보안 설정을 완화하지 않는다.
+- Apply는 현재 문서 generation·계정·route·협업/view mode를 다시 확인한다. MVP는 협업/읽기 전용에서는 적용하지 않는다. 현재 scene을 serializeAsJSON(database)로, files는 별도로 IndexedDB에 저장한 뒤 current identity와 scene fingerprint를 재확인해 기존 canvas 오른쪽에 추가한다. backup 실패/전환/수정 시 적용을 거부한다. capture IMMEDIATELY로 한 번의 undo를 지원하며 마지막 적용 전 backup을 다운로드할 수 있게 한다. Cloud 저장 성공으로 오인하지 않고 기존 autosave/초안은 유지한다.
+- 완료 조건: schema/injection/참조와 bridge 권한·token·제한·취소·provider 실패, preview/apply/backup·stale·undo 검사, 타입/린트/빌드/guardrails, 설치 모델 실제 생성과 로컬 UI 관찰. 첫 버전은 새 다이어그램 추가만 지원하고 기존 도형 AI 수정/대화 이력/Cloud provider/hosted 접근은 후속이다. 모델 품질/추론 지연·로컬 데이터 보존/브라우저 네트워크 정책 한계는 기록한다. core/dependency/DB/relay는 변경하지 않는다.
+
 ## D-032: 단일 relay의 연결·전송·로그 제한
 
 - 범위(2026-10-17): 별도 room repo에서 legacy/sc_ 모두 Engine.IO 연결 64개, handshake 120회/분, canvas 방 8명, 미입장 namespace 30초 timeout을 적용한다. frame 최대 2 MiB + 16 KiB, 암호문은 최대 2 MiB다. Engine packet 단계에서 연결당 4 MiB/10초·1200 frame/10초, process 입력 16 MiB/분, namespace event 600회/10초를 검사한다. binary attachment 조립 전에도 누적 입력/프레임 수를 제한한다.

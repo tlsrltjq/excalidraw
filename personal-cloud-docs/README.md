@@ -12,8 +12,11 @@
 - [operations.md](./operations.md): 로컬 서버 실행/재시작, Supabase 복구, Vercel 배포, 장애 진단, DB 접근 정책 확인
 - [collaboration.md](./collaboration.md): 자체 협업 서버 구성, 앱/서버 저장소 경계, 로컬 진행 결과 및 남은 배포 범위
 - [collaboration-persistence.md](./collaboration-persistence.md): Milestone 8 저장 계약/Firebase adapter와 Supabase 권한·암호화·동시 저장 설계 후보
+- [ai-gateway.md](./ai-gateway.md): 무료 로컬 AI 다이어그램 생성·미리보기·적용과 제한
 
 ## 지금 어디까지 왔나
+
+**최신 우선순위 (2026-10-17): Milestone 9/10 무료 로컬 AI부터 진행한다(D-033).** Milestone 8 운영 점검/배포는 보류했다. `codex/local-ai-diagrams`에서 설명→설치된 Ollama 모델→미리보기→기존 캔버스 옆에 추가를 구현했다. 적용 전 문서별 로컬 백업과 한 번의 undo를 제공한다. Safari 실제 생성·적용·undo/redo를 확인했다. 실행은 operations의 로컬 AI 절차를 따른다. 운영 Vercel에는 배포하지 않았고 기존 도형 AI 수정/Cloud provider/원격 기기 연결은 아직 지원하지 않는다. 아래는 이전 단계별 기록이다.
 
 Milestone 8 relay 제한(2026-10-17): 앱/relay의 `codex/collab-relay-limits`에서 전체/방 연결, 입력 frame·event·byte, 수신자별 전달량과 느린 수신자 대기열을 제한했다(D-032). 프로토콜 DEBUG 출력과 동적 식별자 로그도 차단했다. 로컬 실제 클라이언트 검증과 운영 로그 확인을 구분하며 Render/앱/DB 배포는 바꾸지 않았다. 다음은 배포 전 provider 로그·키/설정 점검, 이후 DB→Edge→relay→실제 두 계정/게스트 검증→flag 활성화 판단이다.
 
@@ -61,7 +64,7 @@ Milestone 8 첫 단위 구현 완료 (2026-10-13): `codex/collab-persistence-ada
 
 2026-10-04 빈 캔버스 재현 기록은 보존하며 D-016 수정/2026-10-09 검증으로 후속 처리했다. 서버 데이터 삭제/유출을 확정한 결과는 아니다. Safari URL 통신 실패와 실제 두 계정 Storage 격리도 확인했다. 강제 종료/eviction, 실제 JWT metadata 쓰기/서명 URL 등은 남아 있다.
 
-다시 시작할 때는 이 문서 → ROADMAP의 Milestone 8 → collaboration-persistence/VALIDATION의 최신 기록을 읽고, 실행이 필요하면 operations.md를 따른다. Milestone 6 심화 검사는 보류 상태로 유지한다.
+다시 시작할 때는 이 문서 → ROADMAP의 Milestone 9/10 → ai-gateway/VALIDATION 최신 기록을 읽고, 실행은 operations.md를 따른다. Milestone 6 심화 검사와 Milestone 8 운영 배포는 보류 상태로 유지한다.
 
 제품 변경은 `codex/cloud-file-save-status`의 `1a246109`로 커밋/push하고 `personal-cloud`에 fast-forward 통합/push했다. `737c21a8`(scene 저장 실패 복구 회귀 검사), `0387136c`(이미지 초안/백업)도 포함된다. GitHub Production 배포 success 및 운영 `version.json`의 `1a24610` 일치를 확인했다. Preview 화면은 Vercel 로그인 보호로 미확인이다. 배포 결과 문서는 `f4a6f006`으로 기능 브랜치에 후속 커밋했다. 현재 개발 브랜치는 `codex/personal-collaboration-server`이며 새 협업 서버/하네스/문서 수정은 아직 미커밋이다. 문서 후속 commit이나 로컬 서버 실행을 운영 협업 서버 전환과 혼동하지 않는다.
 
@@ -74,7 +77,7 @@ Safari 재개 검사에서는 저장된 복원본 재열기, 없는 ID 경고 �
 1. operations의 시작 절차로 기존 origin `http://127.0.0.1:3001/`을 사용한다. 로컬 앱도 운영 Supabase를 사용하므로 TEST 그림만 조작한다.
 2. VALIDATION의 2026-10-09 통합/운영 배포 및 초기화 경합 수정 기록을 확인한다. 제품 코드는 운영 반영했고 로그인 후 운영 기능 확인은 남아 있다.
 3. 사용자 요청으로 심화 검사는 보류하고 기능 개발을 우선한다(D-017). 폴더/검색과 메뉴 정리는 로컬 구현했으며 최신 결과는 VALIDATION을 따른다. 보류한 검사는 Milestone 6의 남은 항목으로 유지한다.
-4. Milestone 7 운영 연결은 완료했다. 운영 화면/실제 sleep 복구는 남긴 채 다음 개발은 Milestone 8 협업 persistence 독립 설계, 이후 AI Gateway, Local LLM, MCP 순서다. 기능 우선 전환이 Milestone 6 전체 완료를 의미하지 않는다.
+4. 2026-10-17 우선순위: Milestone 8 구현은 보존하되 운영 점검/배포는 보류한다. AI Gateway/Local LLM의 생성 MVP부터 사용하고 다음 기능은 기존 다이어그램 AI 수정/대화형 편집이다. 기능 우선 전환이 이전 단계 전체 완료를 의미하지 않는다.
 
 테스트 그림 두 개와 기존 백업은 보존한다. 2026-10-09 Safari 캔버스 변경은 없었고 SQL 쓰기는 rollback했다. Storage 권한 비교용 합성 PNG 한 개는 사용자 승인 후 영구 삭제했다. 원본 영구 삭제/수정/새 그림 저장은 없다. 미저장 작업을 사이트 데이터 삭제나 빈 캔버스 덮어쓰기로 복구하지 않는다.
 
@@ -99,7 +102,9 @@ personal-cloud-docs/
 ├── ENGINEERING_GUARDRAILS.md
 ├── VALIDATION.md
 ├── operations.md
-└── collaboration.md
+├── collaboration.md
+├── collaboration-persistence.md
+└── ai-gateway.md
 ```
 
-계획은 ROADMAP, 설계 이유는 DECISIONS, 실제 확인 결과와 남은 위험은 VALIDATION, 반복 실행 절차는 operations에 기록한다. 협업 설계는 collaboration에 추가했다. `cloud-storage.md`, `ai-gateway.md`, `mcp.md`는 해당 단계에서 추가할 예정이며 아직 존재하지 않는다. 실행 가능한 검증 도구는 `personal-cloud-harness/`, DB 변경 SQL은 `supabase/migrations/`에 둔다.
+계획은 ROADMAP, 설계 이유는 DECISIONS, 실제 확인 결과와 남은 위험은 VALIDATION, 반복 실행 절차는 operations에 기록한다. 협업 설계는 collaboration/collaboration-persistence, AI 설계는 ai-gateway에 기록한다. `cloud-storage.md`, `mcp.md`는 해당 단계에서 추가할 예정이며 아직 존재하지 않는다. 실행 가능한 검증 도구는 `personal-cloud-harness/`, DB 변경 SQL은 `supabase/migrations/`에 둔다.

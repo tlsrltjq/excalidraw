@@ -1,5 +1,9 @@
 # Personal Excalidraw Cloud 로드맵
 
+## 2026-10-17 우선순위 변경
+
+사용자 요청으로 Milestone 8 운영 사전 점검/배포를 보류하고 Milestone 9 AI 생성 기능과 Milestone 10 로컬 Ollama 연결을 먼저 구현한다(D-033). 무료 로컬 생성→미리보기→백업→추가가 첫 단위이며 기존 도형 수정·대화형 편집은 후속이다. 미배포 협업 작업과 기존 미검증 항목을 완료로 지우지 않는다.
+
 ## 2026-10-13 최신 상태
 
 Milestone 7 공개 서버와 운영 앱 endpoint 전환 완료. 운영 Source `d86d9e27`, version/bundle 반영 확인. 공개 relay 연결 로컬 앱의 Safari/별도 브라우저 양방향 편집과 새로고침 재참여 확인. 운영 자동 브라우저 접근 차단으로 운영 화면은 미검증, 실제 sleep/cold start 뒤 복구도 미검증이다. Milestone 7 전체 검증 완료로 판정하지 않는다. 다음 개발은 Milestone 8 설계이며 아래 기록은 당시 상태다.
@@ -816,20 +820,21 @@ Milestone 8 최신 진행 (2026-10-14, D-029): 기본 off 아래 소유자용 �
 
 ## Milestone 9: AI Gateway
 
-- [ ] 별도 설계 문서 `ai-gateway.md` 작성
-- [ ] provider secret을 보관하는 server-side API 구성
-- [ ] provider adapter와 schema validation 구현
-- [ ] 의미 중심 Diagram DSL 정의
-- [ ] Canvas operation allowlist 정의
-- [ ] Preview/Apply와 version snapshot 구현
+- [x] 별도 설계 문서 `ai-gateway.md` 작성
+- [ ] Cloud provider secret을 보관하는 server-side API 구성 (무료 로컬 우선으로 후속)
+- [x] 로컬 provider adapter와 server/client schema validation 구현
+- [x] 의미 중심 Diagram DSL 정의 (최대 24 노드/40 연결)
+- [x] Canvas operation allowlist 정의 (새 다이어그램 추가만)
+- [x] Preview/Apply와 적용 전 로컬 snapshot·다운로드 구현
+- [ ] 기존 도형을 대상으로 하는 AI 수정/대화형 편집
 
 완료 조건: 검증된 구조화 명령으로만 캔버스를 변경한다.
 
 ## Milestone 10: Local LLM
 
-- [ ] localhost 전용 bridge
-- [ ] Origin/token 검증
-- [ ] Ollama provider adapter
+- [x] localhost 전용 bridge
+- [x] Origin/Host/메모리 token 검증
+- [x] Ollama provider adapter (설치된 로컬 생성 모델만)
 - [ ] Cloud/Local provider 선택
 - [ ] 외부 기기 연결이 필요할 때만 인증된 tunnel 검토
 

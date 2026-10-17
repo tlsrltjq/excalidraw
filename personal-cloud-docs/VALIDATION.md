@@ -1,5 +1,16 @@
 # MVP 검증 기록
 
+## 2026-10-17 무료 로컬 AI 다이어그램 MVP
+
+- 우선순위: 사용자 요청으로 Milestone 8 운영 점검/배포를 보류하고 Milestone 9/10 로컬 AI 생성부터 구현했다(D-033). 기능 브랜치 `codex/local-ai-diagrams`. 신규 app `ai/schema/client/editor`, `components/cloud/AIDiagram`과 메뉴/App 연결, loopback bridge/HTTP 검사, README/ROADMAP/DECISIONS/ai-gateway/operations/본 기록이 변경 범위다. core/dependency/DB/relay/운영 endpoint·요금은 바꾸지 않았다.
+- 자동 검증: 앱 범위 36파일/331개(신규 AI 18개 포함) 통과. strict DSL 필드·shape·중복/없는 참조·개수·제어문자·Mermaid escape, 실제 Excalidraw의 기존 element 보존/오른쪽 추가/한 번 undo, backup 실패와 비동기 backup 중 문서 변경/scene 변경/read-only 적용 거부, 실제 IndexedDB 이미지 bytes 포함 `.excalidraw` 복원·다른 key 격리, Strict Mode 단일 연결·명시적 Apply 전 무변경·취소 후 늦은 응답 무시·문서 generation 변경 검사를 포함한다. UI 검사는 Dialog/provider와 preview builder를 mock하며 실제 모델 품질을 대신하지 않는다.
+- 실제 loopback HTTP 하네스 6개 통과: Host/Origin/token 거부, 설치된 local completion 모델만 허용(embedding/명시적 cloud 제외), 고정 upstream URL/프롬프트만 전달/도구 미전달, 모델 override/추가 operation/큰 body 거부, 잘못된 provider output 원문 비노출, single-flight/분당 요청 예산, 브라우저 취소의 upstream AbortSignal 전달. 모델 서버 응답은 합성 mock이며 실제 추론은 아래 Safari 검사와 구분한다.
+- 타입/전체 strict lint/guardrails/diff 검사 통과. 전체 upstream core suite, 운영 DB/두 계정·게스트/실제 모바일·다른 기기 AI/브라우저 강제 종료 내구성은 이번 범위에서 생략했다. Node MODULE_TYPELESS/DEP0169, 기존 MetaProperty lint 진단·테스트 Firebase config 경고는 유지하며 secret 원문을 새로 출력하지 않는다. 최초 테스트의 obsolete API prop/keyboard 옵션·unreferenced file fixture와 Blob URL 환경 mock을 수정한 뒤 재실행했다.
+- Safari: 비로그인 새 origin `http://127.0.0.1:3006/`에서 설치된 `qwen3.5:9b`로 실제 로그인 흐름 생성→미리보기→캔버스 추가→한 번 undo→redo, 창 재열기의 마지막 backup 다운로드 버튼 표시를 확인했다. 5노드 요청에 4노드가 나오는 의미/개수 정확성 한계가 있었다. 두 번째 LR 아키텍처 생성에서 SVG 미리보기 한글 일부 누락을 관찰해 PNG raster export(최대 변 1600px)로 바꿨다. textarea 줄바꿈의 upstream selector 우선순위와 적용 직후 확대도 보완했다. 합성 로컬 그림만 사용했고 Cloud 쓰기/원본 삭제/운영 변경은 없다.
+- 보존/남은 위험: 입력 prompt만 모델에 보내지만 그 내용은 모델이 받는다. 사용자가 의미/배치를 미리보기로 검토해야 한다. 문서별 마지막 적용 전 백업은 파일 포함 최대 32 MiB의 origin별 IndexedDB이며 암호화/로그아웃 자동 삭제/원격 복구가 아니다. 저장소 삭제/eviction, Mac 메모리·추론 지연, 브라우저 네트워크 정책/설치 모델 차이, 렌더링 폰트 차이는 남는다. 기존 도형 AI 수정·대화·Cloud provider/운영 HTTPS·iPad 연결은 미구현이다. 노트북 모델/bridge/개발 앱 실행 절차는 operations를 따른다.
+- 최종 Safari 확인: PNG 미리보기에서 한글 라벨 전체 표시와 입력 줄바꿈, 기존 로그인 그림 보존/오른쪽 아키텍처 추가/100% 화면 맞춤을 확인했다. 실제 `Downloads/before-ai.excalidraw` 다운로드는 적용 전 로그인 흐름 13개 element/6개 text를 포함하고 새 아키텍처는 포함하지 않았다. 이미지 bytes 복원은 자동 검사로 확인했으며 이번 Safari 다운로드는 이미지가 없는 합성 그림이다. 다운로드 백업을 Safari로 재가져오기는 생략했다. 화면 캡처는 `/tmp/personal-excalidraw-ai-preview-final.png`, `/tmp/personal-excalidraw-ai-applied.png`에 보관했다(임시 파일이며 Git에 넣지 않음).
+- 최종 build/PWA precache(62개)도 통과했다. 기존 font/chunk/Browserslist/Node 경고는 유지한다. 앱 전체가 아니라 `excalidraw-app` 범위 331개를 실행했으므로 upstream 전체 suite 통과로 표시하지 않는다. 로컬 모델 11434/bridge 3004/개발 앱 3006은 직접 체험할 수 있도록 실행 상태로 남겼다. 추가 모델 다운로드/유료 API/운영 배포는 없다.
+
 ## 2026-10-17 relay 연결·전송·대기열/코드 로그
 
 - 변경: 별도 room repo의 `src/limits.ts` Budget/Capacity, `src/index.ts`의 handshake lease·Engine input/queue·namespace event·room/recipient 예산·timeout과 로그 억제, PERSONAL 문서. 앱은 신규 `check-room-limits.node-test.mjs`, 기존 admission 하네스의 signed 정원 검사, README/ROADMAP/DECISIONS(D-032)/collaboration/operations/검증 문서만 변경했다. 앱 runtime/core/dependency/lockfile/DB/Edge/엔드포인트·운영 설정·요금은 그대로다.

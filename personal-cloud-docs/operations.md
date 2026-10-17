@@ -14,6 +14,44 @@
 
 ## 노트북에서 다시 시작
 
+### 무료 로컬 AI 다이어그램 (2026-10-17)
+
+`codex/local-ai-diagrams` 코드 기준. Node 24.16.0과 이미 설치된 Ollama/`qwen3.5:9b`로 확인했다. Node의 `.ts` 직접 import가 필요하므로 예전 Node 18에서는 bridge를 실행할 수 없다. 추가 모델 다운로드·유료 API·카드 등록은 필요 없다. 아래 세 창에서 각각 실행하고 켜 둔다. 이미 해당 포트의 서버가 실행 중이면 중복 실행하지 말고 기존 창을 사용한다.
+
+터미널 1: 로컬 모델 서버. 기존 Ollama 앱이 실행 중이라면 이 명령은 생략한다. 설치된 모델은 `ollama list`로 확인하며 bridge는 embedding/명시적 cloud 모델을 제외한다.
+
+```bash
+OLLAMA_HOST=127.0.0.1:11434 OLLAMA_NO_CLOUD=1 ollama serve
+```
+
+터미널 2: AI 연결 서버. 반드시 저장소 최상위에서 실행한다. 재시작하면 연결 token도 바뀌므로 AI 창에서 다시 연결한다. 외부 네트워크에 노출하거나 Ollama Origin 제한을 풀지 않는다.
+
+```bash
+cd /Users/shingiseop/workspace/personal/excalidraw
+node personal-cloud-harness/local-ai-bridge.mjs
+```
+
+터미널 3: 개발 앱. 기존 개발 앱/relay는 중단할 필요 없다. 3006 포트가 사용 중이면 그 주소를 먼저 확인한다. 임의 다른 포트를 쓰면 AI bridge의 허용 Origin과 달라 연결되지 않는다.
+
+```bash
+cd /Users/shingiseop/workspace/personal/excalidraw/excalidraw-app
+../node_modules/.bin/vite --host 127.0.0.1 --port 3006 --strictPort
+```
+
+Safari에서 `http://127.0.0.1:3006/` → 왼쪽 메뉴 → **AI 다이어그램** → 모델/요청 입력 → 생성 → 미리보기 → 캔버스에 추가. 기존 그림을 지우지 않고 오른쪽에 추가한다. 적용 전 마지막 백업은 같은 창의 다운로드 아이콘으로 `.excalidraw` 파일로 받는다. 잘못 추가하면 실행 취소 한 번으로 되돌린다. 협업/읽기 전용에서는 AI 추가를 막는다. 로컬 앱에서도 로그인한 Cloud 그림은 기존 자동 저장 대상이므로 실험에는 빈 로컬 캔버스를 권장한다.
+
+연결 실패는 11434 모델 서버와 3004 bridge부터 확인한다. 생성은 최대 180초, 동시 1개/분당 6회이며 취소할 수 있다. 저장 공간이 부족하거나 현재 그림이 바뀌면 적용하지 않고 오류를 표시한다. 미저장 원본을 지우거나 사이트 데이터를 초기화해서 해결하지 않는다. 백업은 origin별 로컬 마지막 한 개(계정/문서당), 최대 32 MiB, 로그아웃 후에도 보존되며 서버 백업이 아니다. 종료는 해당 실행 창에서 Ctrl+C, 모델만 내리려면 `ollama stop qwen3.5:9b`. 포트의 다른 사용자 프로세스를 임의 종료하지 않는다.
+
+운영 Vercel/DB/Render 설정은 바꾸지 않았다. 운영 HTTPS 주소와 iPad 등 다른 기기의 AI 연결은 미지원이다. 현재 브라우저 origin, Host, 프로세스 token을 검증하며 입력 prompt만 모델에 보낸다. 모델의 의미/배치 정확성은 미리보기에서 확인한다.
+
+재검사:
+
+```bash
+node --test personal-cloud-harness/check-local-ai.node-test.mjs
+yarn test:app --watch=false excalidraw-app/ai excalidraw-app/components/cloud/AIDiagram.test.tsx --minWorkers=1 --maxWorkers=1
+node personal-cloud-harness/check-guardrails.mjs
+```
+
 ### relay 연결·전송·대기열 제한 (미배포, 2026-10-17)
 
 앱/relay 브랜치 `codex/collab-relay-limits`, 설계 D-032. 모두 단일 relay process 기준이며 legacy/sc_ 모두 적용한다. 이번에는 운영 Render를 조회/변경하지 않았다. 마지막 배포 확인 기록은 e2defb1이며 앱의 새 flag는 계속 off다.
