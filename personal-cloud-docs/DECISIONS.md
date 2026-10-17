@@ -1,5 +1,13 @@
 # 설계 결정 기록
 
+## D-032: 단일 relay의 연결·전송·로그 제한
+
+- 범위(2026-10-17): 별도 room repo에서 legacy/sc_ 모두 Engine.IO 연결 64개, handshake 120회/분, canvas 방 8명, 미입장 namespace 30초 timeout을 적용한다. frame 최대 2 MiB + 16 KiB, 암호문은 최대 2 MiB다. Engine packet 단계에서 연결당 4 MiB/10초·1200 frame/10초, process 입력 16 MiB/분, namespace event 600회/10초를 검사한다. binary attachment 조립 전에도 누적 입력/프레임 수를 제한한다.
+- 전달 예산은 단일 process 32 MiB/분이며 수신자 수를 곱해 차감한다. membership/follow 등 control은 수신자당 보수적 1 KiB로 차감한다. 초과 data sender는 연결을 종료해 reliable 전송 성공처럼 계속 편집하지 않게 한다. Engine/namespace 종료로 인원과 timer를 정리한다. 기존 Origin/입장 서명/TTL/read 권한/암호화/legacy 프로토콜은 유지한다. single-process in-memory adapter 전제이며 분산 서버/월 대역폭/TLS·HTTP overhead/모든 handshake 공격/비용 제한 보장이 아니다.
+- debug 출력을 runtime에서 끄고 애플리케이션 로그의 동적 socket/room 식별자 및 startup 예외 원문 출력을 제거한다. health는 고정 상태만 반환한다. 플랫폼 access/SQL/Edge body 로그는 별도 운영 검토 대상이며 이번에 설정을 바꾸거나 확인 완료로 표시하지 않는다.
+- Engine 비동기 handshake 동안에도 용량을 선점하고 실패/timeout/close 시 해제한다. packetCreate/flush/close 공개 이벤트로 미전달 대기열을 연결당 4 MiB/128 packet·process 32 MiB로 제한한다. 느린 수신자 초과 시 해당 Engine 연결을 종료한다. transport/OS의 in-flight bytes와 전체 RSS는 별도이며 코드상의 queue 상한을 전체 메모리 보장으로 확대 해석하지 않는다.
+- 완료 조건: 가짜 시계 pure budget 경계·회복·원자 차감, 실제 loopback client의 방 정원/해제·flood/크기/로그 DEBUG=* 비노출 및 정상 재전송, 기존 admission/read/renew/expiry/legacy 회귀, relay build/lint·앱 harness lint/guardrails. dependency/core/DB/app endpoint/운영 배포·요금은 변경하지 않는다. Render 현재 운영은 기존 commit 유지. 다음은 배포 전 로그/키/Storage 적용 점검과 hosted 순차 적용/두 계정·게스트 검증이다.
+
 ## D-031: DB 공유 quota와 보수적 파일 예약
 
 - 범위(2026-10-17): 새 협업 데이터만 scene 암호문 32 MiB, 파일 4 MiB 고정 슬롯 64개(256 MiB), room 256개/invite 4096개로 제한한다. 기존 개인 Cloud/Firebase는 포함하지 않으며 DB 물리 크기/월 대역폭/비용 상한 보장이 아니다. usage singleton의 원자적 조건부 UPDATE/row lock으로 동시 요청을 직렬화한다. 근거: https://www.postgresql.org/docs/16/transaction-iso.html 의 Read Committed UPDATE 조건 재평가.

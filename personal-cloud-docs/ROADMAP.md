@@ -775,6 +775,8 @@ D-012 결정에 따라 구현했다 (구글 시트/문서 버전 기록을 단�
 
 ## Milestone 8: 공동편집 Persistence 독립
 
+2026-10-17 relay 제한(D-032): 별도 서버의 연결·방 정원, Engine 입력/Socket 이벤트/recipient-weighted 전달 예산 및 queue 상한, 미입장 정리와 payload debug 억제 구현. legacy/sc_ 및 read/renew/expiry 회귀를 로컬 확인한다. 다음은 provider request/SQL parameter 로그와 키·설정/Storage 배포 호환 점검 후 운영 순차 적용/실제 두 계정·게스트 검증이다. 코드 push는 운영 배포가 아니며 기본 flag off를 유지한다.
+
 2026-10-17 공유 quota(D-031): 협업 payload/파일 슬롯·room/invite 수와 files/tickets/checks/reads/writes DB 공유 예산 구현. 새 Storage 경로는 사전 예약 필요. 일회용 PostgreSQL의 역할/상한·보존·backfill 차단과 두 실제 연결의 경쟁 검사 통과. 운영 미적용/flag off. 다음은 relay 연결/송신 제한·인프라 로그 정책 검토 후 hosted DB/Edge/키/relay 순차 적용과 두 클라이언트 검증이다. 이전 날짜의 전역 quota 미구현 기록은 당시 상태로 보존한다.
 
 2026-10-14 자원 제한 첫 단위(D-030): 새 Supabase 파일 압축 해제를 4 MiB + 64 KiB에서 중단하고 Edge 파일/ticket에 isolate별 요청 수/동시 처리 상한을 추가했다. 상한 초과·실패 슬롯 반환·정상 codec 호환을 검사한다. 운영 미배포/기본 flag off 유지. 남은 공개 전제는 DB 전역 scene/Storage 용량·분산 요청 quota, relay 전체 연결/송신 상한, 인프라 body/SQL parameter 로그 정책과 hosted 검증이다. 비용 상한 완성으로 표시하지 않는다.

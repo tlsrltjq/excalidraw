@@ -14,6 +14,37 @@
 
 ## 노트북에서 다시 시작
 
+### relay 연결·전송·대기열 제한 (미배포, 2026-10-17)
+
+앱/relay 브랜치 `codex/collab-relay-limits`, 설계 D-032. 모두 단일 relay process 기준이며 legacy/sc_ 모두 적용한다. 이번에는 운영 Render를 조회/변경하지 않았다. 마지막 배포 확인 기록은 e2defb1이며 앱의 새 flag는 계속 off다.
+
+| 경계 | 한도 |
+| --- | --- |
+| Engine 연결/handshake | 진행 중 handshake를 포함해 64개, 신규 허용 Origin handshake 120회/분 |
+| 방 정원 | canvas당 8명. read-only도 포함. follow room은 같은 canvas 안에서만 사용 |
+| 미입장 정리 | Engine namespace 미연결 10초, namespace 연결 후 canvas 미입장 30초 |
+| wire frame / 암호문 | frame 2 MiB + 16 KiB, 실제 ciphertext 2 MiB |
+| 연결 입력 | 4 MiB/10초, 1200 frame/10초, Socket 이벤트 600회/10초 |
+| process 입력/전달 | 입력 16 MiB/분, 전달 32 MiB/분. 전달은 payload+고정 envelope 추정치 × 수신자 수, membership/follow는 1 KiB/수신자로 계산 |
+| 미전달 queue | 연결당 4 MiB/128 packet, process 32 MiB. flush/close 시 예약 반환 |
+
+Engine packet 단계에서 검사하므로 미완성 바이너리 attachment도 연결별 frame/byte 예산을 소비한다. 느린 polling 수신자가 queue 한도를 넘으면 그 수신자만 종료하며 정상 송신자는 계속 사용할 수 있다. 입력·전달 과다 sender도 종료한다. 정원이 찬 legacy 방은 연결 종료, sc_ 방은 입장 ACK false로 거부한다. 사용자가 떠나면 정원이 복구된다.
+
+프로토콜 ACK/초기 challenge/ping/pong·HTTP/TLS overhead와 transport/OS in-flight 메모리는 이 전달/queue 수치에 모두 포함되는 것이 아니다. 한도는 process 재시작 시 초기화되고 분산 서버에서는 공유되지 않는다. **월 사용량·실제 총 대역폭·전체 RSS·무료 비용 보장이 아니다.** 큰 합성 그림/실제 두 브라우저/모바일·cold start는 운영 적용 전 확인해야 한다.
+
+제한에 걸리면 미저장 작업을 가능한 파일로 내보내고 입력/전달 제한은 1분 이상 기다린 뒤 방에 재입장한다. 서버에서 강제로 종료한 연결은 Socket.IO가 자동 재접속하지 않을 수 있다. 정원이 찼다면 다른 참가자가 떠나야 한다. 그림/초안 삭제나 wildcard/한도 해제로 해결하지 않는다. 기존의 collaborative 종료 flush/미다운로드 파일 완전 복구 한계는 여전히 남는다.
+
+코드 로그 확인 결과: relay가 `DEBUG=*`도 끄고 socket/room/원문을 출력하지 않는다. 설정 오류는 입력 원문 대신 고정 메시지를 사용한다. Edge quota/ticket/file handler도 코드상 원문을 로깅하지 않는다. **Render access log/Supabase request body·SQL parameter·Edge exception 로그 수집 설정은 아직 미확인이다.** 다음 운영 사전 점검에서는 감사 로그 전체를 끄지 말고 payload/key/proof/Authorization의 비수집 또는 마스킹 여부·접근 권한·보존 기간을 확인한다. 확인을 위해 실제 비밀값이나 그림 원문을 일부러 로그에 쓰지 않는다.
+
+relay repo에서 `yarn build`, `yarn test:code --max-warnings=0`를 실행한 뒤 앱 repo에서 다음 검사를 실행한다. 임시 loopback 서버를 하네스가 생성/종료하므로 기존 3002 서버는 필요 없고 기존 사용자 서버를 종료하지 않는다.
+
+```bash
+node --test personal-cloud-harness/check-room-limits.node-test.mjs
+node --test personal-cloud-harness/check-room-admission.node-test.mjs
+```
+
+Engine 옵션과 공개 이벤트 참고: https://socket.io/docs/v4/server-options/ , https://socket.io/docs/v4/server-instance/ . 실제 동작은 설치 Socket.IO 4.8.4/Engine.IO 소스와 loopback 검사로 확인했다. dependency를 갱신하면 packetCreate/flush/close 및 handshake lease 순서를 다시 검사한다. 운영 배포·요금/Origin·서명 키·엔드포인트 변경은 하지 않았다.
+
 ### DB 공유 quota (개발 완료·운영 미적용, 2026-10-17)
 
 새 migration: `supabase/migrations/20261017090000_collab_project_quotas.sql`. 기존 개인 그림/Firebase가 아닌 **새 Supabase 협업 데이터**에만 적용한다.

@@ -1,5 +1,11 @@
 # 자체 공동편집 서버
 
+## 2026-10-17 relay 자원·로그 경계
+
+서버/앱 `codex/collab-relay-limits`에서 프로세스/방 정원, handshake lease·입력·전달·queue 제한을 구현했다(D-032). Engine의 packet/packetCreate/flush/close 경계에서 바이너리 재조립과 느린 수신자 대기열을 제한하고, 수신자 수를 곱해 전달 예산을 사용한다. private buffer 필드를 읽거나 dependency/adapter를 교체하지 않았다. Origin·서명·TTL/read 범위 및 legacy 형식은 유지한다. 코드 로그의 room/socket/원문 debug 출력을 제거했지만 provider access/body/SQL parameter 로그는 운영 점검 전이다.
+
+검사: `node --test personal-cloud-harness/check-room-limits.node-test.mjs`와 기존 admission 하네스. 새 서버 binary를 먼저 빌드한다. 각 하네스는 별도 임시 loopback 포트에서 실행하고 종료한다. 기존 3002/운영 relay와 사용자 탭을 건드리지 않는다. 설정/초과 대응은 operations 최신 절을 따른다. 마지막 공개 Render 확인 기록은 e2defb1이며 이번에는 운영 조회/배포를 하지 않았다.
+
 ## 2026-10-14 relay admission 구현
 
 서버 기능 브랜치 `codex/collab-relay-admission`에 새 sc_ room의 공개 키 입장 검증/socket challenge/갱신/만료 종료와 read/write 송수신·follow 제한을 구현했다. legacy hex room은 유지한다. 앱의 `check-room-admission.node-test.mjs`가 별도 loopback 임시 포트로 이 빌드의 서버를 시작하고 합성 키/클라이언트만 사용한 뒤 종료한다. 상세 프로토콜은 collaboration-persistence의 D-026 기록을 따른다. 공개 Render 서버는 기존 `e2defb1`을 유지하며 push는 배포가 아니다.

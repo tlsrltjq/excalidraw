@@ -15,6 +15,8 @@
 
 ## 지금 어디까지 왔나
 
+Milestone 8 relay 제한(2026-10-17): 앱/relay의 `codex/collab-relay-limits`에서 전체/방 연결, 입력 frame·event·byte, 수신자별 전달량과 느린 수신자 대기열을 제한했다(D-032). 프로토콜 DEBUG 출력과 동적 식별자 로그도 차단했다. 로컬 실제 클라이언트 검증과 운영 로그 확인을 구분하며 Render/앱/DB 배포는 바꾸지 않았다. 다음은 배포 전 provider 로그·키/설정 점검, 이후 DB→Edge→relay→실제 두 계정/게스트 검증→flag 활성화 판단이다.
+
 Milestone 8 공유 quota (2026-10-17): `codex/collab-project-quotas`에 협업 scene 32 MiB/파일 4 MiB 슬롯 64개/room 256개/invite 4096개와 DB 공유 분당 요청 예산을 구현했다(D-031). Storage 미예약 경로 차단, 보수적 슬롯 재시도, 실제 두 PostgreSQL 연결의 마지막 용량/요청 경쟁, 기존 권한/CAS 회귀를 확인했다. 운영 migration/Edge/flag는 적용하지 않았다. 다음은 relay 연결·송신 총량과 인프라 로그 검토, 이후 hosted 배포/두 계정·게스트 검증이다. 이 제한은 협업 데이터 대상이며 개인 Cloud/프로젝트 물리 크기·월 대역폭/무료 요금 상한을 보장하지 않는다.
 
 Milestone 8 자원 제한 첫 단위 (2026-10-14): `codex/collab-resource-limits`에서 새 Supabase 파일의 압축 해제 중단 상한과 Edge 파일·ticket의 인스턴스별 요청/동시 처리 제한을 구현했다(D-030). 운영에는 적용하지 않았다. 다음은 DB가 강제하는 프로젝트 총 저장량·분산 요청 quota와 relay 연결/전송 제한·인프라 로그 검토다. 이 단위만으로 무료 사용량/공개 abuse 보호가 완성됐다고 보지 않으며 운영 flag off를 유지한다.

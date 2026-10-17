@@ -1,5 +1,15 @@
 # MVP 검증 기록
 
+## 2026-10-17 relay 연결·전송·대기열/코드 로그
+
+- 변경: 별도 room repo의 `src/limits.ts` Budget/Capacity, `src/index.ts`의 handshake lease·Engine input/queue·namespace event·room/recipient 예산·timeout과 로그 억제, PERSONAL 문서. 앱은 신규 `check-room-limits.node-test.mjs`, 기존 admission 하네스의 signed 정원 검사, README/ROADMAP/DECISIONS(D-032)/collaboration/operations/검증 문서만 변경했다. 앱 runtime/core/dependency/lockfile/DB/Edge/엔드포인트·운영 설정·요금은 그대로다.
+- relay 결과는 `codex/collab-relay-limits`의 `5fa5e6c`에 커밋했다. 앱 하네스/문서는 같은 이름의 별도 기능 브랜치다. 운영 브랜치 merge/Render 배포는 하지 않는다.
+- resource 하네스 8개 통과: fake clock의 예산 경계·회복·잘못된 cost·fanout 및 capacity 이중 반환 안전성; 80개 동시 handshake 중 64개만 허용; 64개 연결 후 추가 거부/해제 재사용; 실제 raw polling reader를 멈춰 queue 상한에 따른 제거/정상 peer 재전송 유지; 실제 30초 미입장 timeout/입장 idle peer 유지; room 8명과 recipient-weighted 2 MiB 전달 예산 초과 시 미전달/송신자 종료; oversized·event spam·미완성 binary attachment flood 종료/신규 정상 peer 재전송; DEBUG=*와 잘못된 Origin 설정에서 합성 socket/room/payload/config marker 비출력. 전체 RSS/OS buffer/공개 부하·분산 제한을 측정한 것은 아니다.
+- 기존 admission/relay 하네스는 13개(새 signed 정원/reader 포함·초과 ACK false·퇴장 슬롯 재사용 추가) 통과, 내부 legacy 하네스 7개도 새 서버 바이너리에서 통과했다. 기존 write 양방향/read 수신·송신 제한/서명 위조/만료/갱신/read downgrade/재연결/프론트 session worker·Origin/legacy AES bytes 동작을 유지했다. ticket contract byte parity도 그대로 통과했다.
+- relay build(typecheck)/전체 strict lint와 변경 코드 format/diff 통과. 앱 harness scoped lint/format/diff/guardrails 통과. 최초 relay typecheck의 Engine packet implicit-any는 unknown data 경계 타입으로 보완했다. 앱 전체 suite/typecheck/build, DB 하네스와 Safari/두 실제 브라우저/모바일·Render cold start·컨테이너/공개 부하 검사는 앱 runtime/schema/UI 무변경으로 생략했다. Node MODULE_TYPELESS 경고는 기존과 같으며 repo metadata를 바꾸지 않았다.
+- 코드 로그 점검: relay protocol debug를 환경 DEBUG=*에서도 비활성화하고 동적 식별자/원문 exception 로그를 제거했다. Edge quota/ticket/file 코드에는 원문 console 로그가 없음을 확인했다. provider access/request-body/SQL parameter·Edge exception 로그 정책은 미조회/미검증이며 코드 점검을 운영 확인으로 대체하지 않는다. fixed health/일반 startup error 외 상세 진단이 줄어드는 한계가 있다.
+- 모든 합성 relay/연결은 하네스가 finally에서 정리했다. 기존 사용자 3002 서버/브라우저/실제 그림·로그인/DB·서명 키/Render/Vercel/무료 설정은 변경하지 않았다. 상한은 process 재시작 시 초기화되고 protocol overhead/transport in-flight·월 사용량·요금 전체를 보장하지 않는다. 강제 종료 후 자동 재접속/미저장 collaborative local draft/최종 flush 한계도 남는다. 다음은 provider 로그/키·환경/Storage 호환 사전 점검 후 hosted 순차 배포·두 계정/게스트 검증이다.
+
 ## 2026-10-17 DB 공유 quota
 
 - 변경: quota/ledger/RLS·서비스 전용 RPC·Storage/scene/metadata trigger migration, shared projectQuota RPC helper, files/ticket handler와 entrypoint, 4개 기존 fixture 및 신규 mock HTTP test, 일회용 DB bootstrap/하네스/SQL 검사, 계획·운영 문서. core/dependency/일반 개인 Cloud/relay/운영 설정·요금은 변경하지 않았다. 운영 flag off 유지.

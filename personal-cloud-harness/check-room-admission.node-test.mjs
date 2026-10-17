@@ -195,6 +195,31 @@ test(
       await join(b);
       await join(reader, "read");
       await t.test(
+        "signed room capacity includes readers and frees a departed slot",
+        async () => {
+          const capacityRoom = `sc_${"c".repeat(20)}`;
+          const peers = [];
+          for (let i = 0; i < 8; i++) {
+            const peer = await connect();
+            await join(peer, i % 2 ? "read" : "write", capacityRoom);
+            peers.push(peer);
+          }
+          const extra = await connect();
+          assert.deepEqual(
+            await ack(extra, "join-collab-room", {
+              roomId: capacityRoom,
+              ticket: await ticket(extra, "write", capacityRoom),
+            }),
+            { ok: false },
+          );
+          peers[0].close();
+          await pause(50);
+          await join(extra, "write", capacityRoom);
+          peers.forEach((peer) => peer.close());
+          extra.close();
+        },
+      );
+      await t.test(
         "write peers exchange bytes both ways; readers receive",
         async () => {
           await receive(a, b);
